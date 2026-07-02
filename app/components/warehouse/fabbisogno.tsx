@@ -8,7 +8,7 @@ import AIBotWidget from "@/app/components/warehouse/AIBotWidget";
 import { supabase } from "@/app/lib/SupabaseClient";
 
 // Importiamo le funzioni create in precedenza
-import { getReordersByWarehouse, createReorder, updateReorderNotes, updateReorderStatus, updateReorderQuantity, deleteReorder } from "@/app/warehouse/[id]/actions";
+import { getReordersByWarehouse, getWarehouseById, createReorder, updateReorderNotes, updateReorderStatus, updateReorderQuantity, deleteReorder } from "@/app/warehouse/[id]/actions";
 
 export interface FabbisognoItem {
     id: string;
@@ -40,6 +40,7 @@ function getNotePreview(notes: string) {
 
 export default function FabbisognoContent({ warehouseId }: FabbisognoContentProps) {
     const [items, setItems] = useState<FabbisognoItem[]>([]);
+    const [warehouseName, setWarehouseName] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [filter, setFilter] = useState<"tutti" | "attivi" | "completati">("attivi");
@@ -55,9 +56,15 @@ export default function FabbisognoContent({ warehouseId }: FabbisognoContentProp
 
         async function loadData() {
             setLoading(true);
-            const { data, error } = await getReordersByWarehouse(warehouseId);
-            if (!error && data) {
-                setItems(data as FabbisognoItem[]);
+            const [reordersResult, warehouseResult] = await Promise.all([
+                getReordersByWarehouse(warehouseId),
+                getWarehouseById(warehouseId),
+            ]);
+            if (!reordersResult.error && reordersResult.data) {
+                setItems(reordersResult.data as FabbisognoItem[]);
+            }
+            if (!warehouseResult.error && warehouseResult.data) {
+                setWarehouseName(warehouseResult.data.w_name ?? null);
             }
             setLoading(false);
         }
@@ -187,6 +194,12 @@ export default function FabbisognoContent({ warehouseId }: FabbisognoContentProp
     return (
         <main className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans antialiased">
             <div className="max-w-3xl mx-auto pt-10 px-1">
+
+                {warehouseName && (
+                    <h2 className="px-1 text-sm tracking-tight uppercase">
+                        🏰{warehouseName}
+                    </h2>
+                )}
 
                 {/* Filtro Tab + Aggiungi (desktop: stessa riga, lato opposto) */}
                 <div className="my-2 px-1 flex items-center justify-between gap-2">

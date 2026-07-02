@@ -60,6 +60,25 @@ export const createReorder = async ({ productName, notes, warehouseId, quantity 
 };
 
 /**
+ * Recupera un singolo magazzino per id
+ */
+export const getWarehouseById = async (warehouseId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('whearhouses')
+      .select('id, w_name')
+      .eq('id', warehouseId)
+      .single();
+
+    if (error) throw error;
+    return { data, error: null };
+  } catch (error: any) {
+    console.error("Errore nel recupero del magazzino:", error.message);
+    return { data: null, error };
+  }
+};
+
+/**
  * 3. Utility: Recupera la lista dei magazzini
  */
 export const getWarehouses = async () => {
