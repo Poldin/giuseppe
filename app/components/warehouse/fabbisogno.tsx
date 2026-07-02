@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, Package, Plus, Minus, ChevronDown, CheckCircle2, Circle } from "lucide-react";
+import { Menu, Package, Plus, Minus, ChevronDown, CheckCircle2, Circle, Trash2 } from "lucide-react";
 import AddFabbisognoDialog from "@/app/components/warehouse/AddFabbisognoDialog";
 import AIBotWidget from "@/app/components/warehouse/AIBotWidget";
 import { supabase } from "@/app/lib/SupabaseClient";
 
 // Importiamo le funzioni create in precedenza
-import { getReordersByWarehouse, createReorder, updateReorderNotes, updateReorderStatus, updateReorderQuantity } from "@/app/warehouse/[id]/actions";
+import { getReordersByWarehouse, createReorder, updateReorderNotes, updateReorderStatus, updateReorderQuantity, deleteReorder } from "@/app/warehouse/[id]/actions";
 
 export interface FabbisognoItem {
     id: string;
@@ -45,6 +45,8 @@ export default function FabbisognoContent({ warehouseId }: FabbisognoContentProp
     const [filter, setFilter] = useState<"tutti" | "attivi" | "completati">("attivi");
     const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
     const [tempNoteText, setTempNoteText] = useState<string>("");
+    const [deleteTarget, setDeleteTarget] = useState<FabbisognoItem | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
     const skipNextNoteBlurSave = useRef(false);
 
     // 1. CARICAMENTO DATI + REALTIME
@@ -152,6 +154,24 @@ export default function FabbisognoContent({ warehouseId }: FabbisognoContentProp
 
     const toggleExpand = (id: string) => {
         setExpandedId(expandedId === id ? null : id);
+    };
+
+    const handleDeleteReorder = async () => {
+        if (!deleteTarget) return;
+
+        setIsDeleting(true);
+        const { error } = await deleteReorder(deleteTarget.id);
+        setIsDeleting(false);
+
+        if (error) {
+            console.error("Errore durante l'eliminazione:", error);
+            return;
+        }
+
+        setItems((prev) => prev.filter((item) => item.id !== deleteTarget.id));
+        if (expandedId === deleteTarget.id) setExpandedId(null);
+        if (editingNoteId === deleteTarget.id) setEditingNoteId(null);
+        setDeleteTarget(null);
     };
 
     // Filtro logico basato sulla colonna completed_at del DB
@@ -354,6 +374,14 @@ export default function FabbisognoContent({ warehouseId }: FabbisognoContentProp
                                                                 </span>
                                                             </p>
                                                         )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setDeleteTarget(item)}
+                                                            className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-tight rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                                        >
+                                                            <Trash2 size={13} />
+                                                            Elimina
+                                                        </button>
                                                     </div>
                                                 </div>
                                             </motion.div>
@@ -365,6 +393,50 @@ export default function FabbisognoContent({ warehouseId }: FabbisognoContentProp
                     </AnimatePresence>
                 </div>
             </div>
+            <AnimatePresence>
+                {deleteTarget && (
+                    <div key="delete-confirm-backdrop" className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/40 backdrop-blur-sm p-4">
+                        <motion.div
+                            key="delete-confirm"
+                            initial={{ opacity: 0, scale: 0.96 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.96 }}
+                            className="w-full max-w-sm bg-white dark:bg-zinc-950 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden"
+                        >
+                            <div className="p-5 space-y-3">
+                                <h3 className="font-black text-sm uppercase tracking-tighter text-zinc-900 dark:text-zinc-50">
+                                    Elimina
+                                </h3>
+                                <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                                    Vuoi eliminare definitivamente{" "}
+                                    <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                                        {deleteTarget.product_name}
+                                    </span>
+                                    ? L&apos;operazione non può essere annullata.
+                                </p>
+                                <div className="flex gap-2 pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setDeleteTarget(null)}
+                                        disabled={isDeleting}
+                                        className="flex-1 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-bold uppercase tracking-wider text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors disabled:opacity-50"
+                                    >
+                                        Annulla
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleDeleteReorder}
+                                        disabled={isDeleting}
+                                        className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-xs font-bold uppercase tracking-wider hover:bg-red-700 transition-colors disabled:opacity-50"
+                                    >
+                                        {isDeleting ? "Eliminazione..." : "Elimina"}
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
             <AIBotWidget />
         </main>
     );

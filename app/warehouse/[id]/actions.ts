@@ -178,3 +178,18 @@ export const updateReorderQuantity = async (id: string, quantity: number) => {
     return { data: null, error };
   }
 };
+
+export const deleteReorder = async (id: string) => {
+  try {
+    const { error } = await supabase
+      .from('reorders')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return { error: null };
+  } catch (error: any) {
+    console.error("Errore nell'eliminazione del riordino:", error.message);
+    return { error };
+  }
+};
