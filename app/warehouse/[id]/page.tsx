@@ -65,7 +65,7 @@ export default function WarehousePage({ params }: PageProps) {
                                     : "text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-400"
                                     }`}
                             >
-                                🪙ACQUISTI
+                                🪙DA ACQUISTARE
                             </button>
 
                             {/* Tab Inventario */}
