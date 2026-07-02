@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, Package, Plus, Minus, ChevronDown, CheckCircle2, Circle } from "lucide-react";
 import AddFabbisognoDialog from "@/app/components/warehouse/AddFabbisognoDialog";
@@ -44,6 +44,7 @@ export default function FabbisognoContent({ warehouseId }: FabbisognoContentProp
     const [filter, setFilter] = useState<"tutti" | "attivi" | "completati">("attivi");
     const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
     const [tempNoteText, setTempNoteText] = useState<string>("");
+    const skipNextNoteBlurSave = useRef(false);
 
     // 1. CARICAMENTO DATI DAL DB (FETCH)
     useEffect(() => {
@@ -252,18 +253,34 @@ export default function FabbisognoContent({ warehouseId }: FabbisognoContentProp
                                                 <div className="p-2 text-xs space-y-2 text-zinc-600 dark:text-zinc-400 font-sans">
                                                     <div>
                                                         {isEditingNote ? (
-                                                            <div className="flex gap-2 items-center mt-1">
-                                                                <input
-                                                                    type="text"
+                                                            <div className="mt-1 space-y-1">
+                                                                <textarea
                                                                     value={tempNoteText}
                                                                     onChange={(e) => setTempNoteText(e.target.value)}
                                                                     onKeyDown={(e) => {
-                                                                        if (e.key === "Enter") updateNote(item.id, tempNoteText);
-                                                                        if (e.key === "Escape") setEditingNoteId(null);
+                                                                        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                                                                            e.preventDefault();
+                                                                            updateNote(item.id, tempNoteText);
+                                                                        }
+                                                                        if (e.key === "Escape") {
+                                                                            skipNextNoteBlurSave.current = true;
+                                                                            setEditingNoteId(null);
+                                                                        }
                                                                     }}
-                                                                    className="flex-1 px-2 py-1 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                                                    onBlur={() => {
+                                                                        if (skipNextNoteBlurSave.current) {
+                                                                            skipNextNoteBlurSave.current = false;
+                                                                            return;
+                                                                        }
+                                                                        updateNote(item.id, tempNoteText);
+                                                                    }}
+                                                                    rows={3}
+                                                                    className="w-full min-h-[72px] resize-y px-2 py-1.5 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none whitespace-pre-wrap"
                                                                     autoFocus
                                                                 />
+                                                                <p className="text-[10px] text-zinc-400">
+                                                                    Invio per andare a capo · Ctrl+Invio per salvare
+                                                                </p>
                                                             </div>
                                                         ) : (
                                                             <p

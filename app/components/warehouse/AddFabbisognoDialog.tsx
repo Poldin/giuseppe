@@ -360,12 +360,12 @@ export default function AddFabbisognoDialog({ warehouseId, onAdd, onUpdateQuanti
                                                                         exit={{ height: 0, opacity: 0 }}
                                                                         className="overflow-hidden"
                                                                     >
-                                                                        <input
-                                                                            type="text"
+                                                                        <textarea
                                                                             placeholder="Aggiungi una nota per questo materiale..."
                                                                             value={rState.note}
                                                                             onChange={(e) => updateRowState(prod.id, { note: e.target.value })}
-                                                                            className="w-full mt-1 px-2.5 py-1.5 text-xs bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:border-zinc-400 font-sans text-zinc-900 dark:text-zinc-100"
+                                                                            rows={2}
+                                                                            className="w-full mt-1 min-h-[56px] resize-y px-2.5 py-1.5 text-xs bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:border-zinc-400 font-sans text-zinc-900 dark:text-zinc-100 whitespace-pre-wrap"
                                                                         />
                                                                     </motion.div>
                                                                 )}
@@ -451,12 +451,12 @@ export default function AddFabbisognoDialog({ warehouseId, onAdd, onUpdateQuanti
                                             <AnimatePresence>
                                                 {manualExpanded && (
                                                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden mt-2">
-                                                        <input
-                                                            type="text"
+                                                        <textarea
                                                             placeholder="Aggiungi una nota per questo inserimento..."
                                                             value={manualNote}
                                                             onChange={(e) => setManualNote(e.target.value)}
-                                                            className="w-full px-2.5 py-1.5 text-xs bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none font-sans text-zinc-900 dark:text-zinc-100"
+                                                            rows={2}
+                                                            className="w-full min-h-[56px] resize-y px-2.5 py-1.5 text-xs bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none font-sans text-zinc-900 dark:text-zinc-100 whitespace-pre-wrap"
                                                         />
                                                     </motion.div>
                                                 )}
