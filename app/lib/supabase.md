@@ -1,0 +1,114 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.brands (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  name text,
+  image_url text,
+  CONSTRAINT brands_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.manufacturers (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone DEFAULT now(),
+  full_legal_name text,
+  gs1_prefix text,
+  hibc_lic text,
+  metadata jsonb,
+  srn_code text,
+  VAT text,
+  fiscal_code text,
+  legal_name_norm text,
+  url_image text,
+  CONSTRAINT manufacturers_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.master_catalog (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  name text NOT NULL,
+  tags ARRAY DEFAULT '{}'::text[],
+  brand_id uuid,
+  default_min_stock numeric DEFAULT 5,
+  created_at timestamp with time zone DEFAULT now(),
+  sku text,
+  image_url text,
+  ean text,
+  metadata jsonb,
+  default_description text,
+  udi_di text,
+  hibc_primary text,
+  manufacturer_id uuid,
+  search_payload text,
+  aic_code text,
+  cod_catalogo_fabbr_ass text,
+  search_payload_tsvector tsvector,
+  log_execution_cleaning text,
+  CONSTRAINT master_catalog_pkey PRIMARY KEY (id),
+  CONSTRAINT master_catalog_brand_id_fkey FOREIGN KEY (brand_id) REFERENCES public.brands(id),
+  CONSTRAINT master_catalog_manufacturer_id_fkey FOREIGN KEY (manufacturer_id) REFERENCES public.manufacturers(id)
+);
+CREATE TABLE public.products (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  name text NOT NULL,
+  sku text,
+  category text,
+  min_stock_level numeric DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  image_url text,
+  description text,
+  master_catalogue_id uuid,
+  metadata jsonb,
+  ean text,
+  brand_id uuid,
+  udi_di text,
+  hibc_primary text,
+  manufacturer_id uuid,
+  aic_code text,
+  whearhouse_id uuid,
+  CONSTRAINT products_pkey PRIMARY KEY (id),
+  CONSTRAINT products_brand_id_fkey FOREIGN KEY (brand_id) REFERENCES public.brands(id),
+  CONSTRAINT products_manufacturer_id_fkey FOREIGN KEY (manufacturer_id) REFERENCES public.manufacturers(id),
+  CONSTRAINT products_master_catalogue_id_fkey FOREIGN KEY (master_catalogue_id) REFERENCES public.master_catalog(id),
+  CONSTRAINT products_whearhouse_id_fkey FOREIGN KEY (whearhouse_id) REFERENCES public.whearhouses(id)
+);
+CREATE TABLE public.product_batch (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  product_id uuid NOT NULL,
+  batch_number text DEFAULT ''::text,
+  expiry_date date,
+  quantity numeric NOT NULL DEFAULT 0,
+  last_updated timestamp with time zone DEFAULT now(),
+  price numeric DEFAULT '0'::numeric CHECK (price >= 0::numeric),
+  location text,
+  udi_pi text,
+  hibc_secondary text,
+  VAT numeric CHECK ("VAT" >= 0::numeric),
+  CONSTRAINT product_batch_pkey PRIMARY KEY (id),
+  CONSTRAINT product_batch_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
+);
+CREATE TABLE public.whearhouses (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  w_name text,
+  other jsonb,
+  CONSTRAINT whearhouses_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.stock_movements (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  type text,
+  batch_id uuid,
+  other jsonb,
+  CONSTRAINT stock_movements_pkey PRIMARY KEY (id),
+  CONSTRAINT stock_movements_batch_id_fkey FOREIGN KEY (batch_id) REFERENCES public.product_batch(id)
+);
+CREATE TABLE public.reorders (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  product_name text,
+  notes text,
+  edited_at timestamp with time zone,
+  completed_at timestamp with time zone,
+  warehouse_id uuid,
+  CONSTRAINT reorders_pkey PRIMARY KEY (id),
+  CONSTRAINT reorders_warehouse_id_fkey FOREIGN KEY (warehouse_id) REFERENCES public.whearhouses(id)
+);
