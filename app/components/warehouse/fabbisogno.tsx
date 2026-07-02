@@ -126,35 +126,36 @@ export default function FabbisognoContent({ warehouseId }: FabbisognoContentProp
         <main className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans antialiased">
             <div className="max-w-3xl mx-auto pt-10 px-1">
 
-                {/* Filtro Tab */}
-                <div className="my-2 px-1 flex gap-1">
-                    <button
-                        onClick={() => setFilter("attivi")}
-                        className={`px-3 py-1.5 text-xs font-bold uppercase tracking-tight rounded-lg transition-all ${filter === "attivi"
-                            ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950"
-                            : "text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
-                            }`}
-                    >
-                        mancano ({items.filter(i => i.completed_at === null).length})
-                    </button>
-                    <button
-                        onClick={() => setFilter("completati")}
-                        className={`px-3 py-1.5 text-xs font-bold uppercase tracking-tight rounded-lg transition-all ${filter === "completati"
-                            ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950"
-                            : "text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
-                            }`}
-                    >
-                        ✅risolte ({items.filter(i => i.completed_at !== null).length})
-                    </button>
-                </div>
+                {/* Filtro Tab + Aggiungi (desktop: stessa riga, lato opposto) */}
+                <div className="my-2 px-1 flex items-center justify-between gap-2">
+                    <div className="flex gap-1">
+                        <button
+                            onClick={() => setFilter("attivi")}
+                            className={`px-3 py-1.5 text-xs font-bold uppercase tracking-tight rounded-lg transition-all ${filter === "attivi"
+                                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950"
+                                : "text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                                }`}
+                        >
+                            mancano ({items.filter(i => i.completed_at === null).length})
+                        </button>
+                        <button
+                            onClick={() => setFilter("completati")}
+                            className={`px-3 py-1.5 text-xs font-bold uppercase tracking-tight rounded-lg transition-all ${filter === "completati"
+                                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950"
+                                : "text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                                }`}
+                        >
+                            ✅risolte ({items.filter(i => i.completed_at !== null).length})
+                        </button>
+                    </div>
 
-                {/* Il dialog riceve la funzione che scrive su DB */}
-                <AddFabbisognoDialog
-                    warehouseId={warehouseId}
-                    onAdd={handleAddNewFabbisogno}
-                    onUpdateQuantity={handleUpdateQuantity}
-                    currentFabbisogno={items}
-                />
+                    <AddFabbisognoDialog
+                        warehouseId={warehouseId}
+                        onAdd={handleAddNewFabbisogno}
+                        onUpdateQuantity={handleUpdateQuantity}
+                        currentFabbisogno={items}
+                    />
+                </div>
 
                 {/* Lista dei Prodotti */}
                 <div className="space-y-1 pb-24">

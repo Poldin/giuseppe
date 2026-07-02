@@ -168,12 +168,12 @@ export default function AddFabbisognoDialog({ warehouseId, onAdd, onUpdateQuanti
 
     return (
         <>
-            <div className="w-full md:w-auto">
+            <div className="fixed bottom-1 left-1 z-40 md:static md:z-auto">
                 <button
                     onClick={() => setIsOpen(true)}
-                    className="w-fit rounded-xl md:w-auto flex items-center justify-center gap-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold text-sm uppercase tracking-tight px-6 py-4 md:py-2.5 md:rounded-xl fixed md:relative bottom-1 left-1 md:bottom-auto md:right-auto z-40 md:z-0 shadow-lg md:shadow-none hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors duration-200"
+                    className="flex items-center justify-center gap-1.5 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold uppercase tracking-tight shadow-lg md:shadow-none hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors duration-200 px-6 py-4 text-sm md:px-3 md:py-1.5 md:text-xs md:rounded-lg"
                 >
-                    <Plus size={18} /> Aggiungi
+                    <Plus size={18} className="md:w-3.5 md:h-3.5" /> Aggiungi
                 </button>
             </div>
 
