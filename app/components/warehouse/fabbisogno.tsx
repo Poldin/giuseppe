@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Menu, Package, Plus, Minus, ChevronDown, CheckCircle2, Circle } from "lucide-react";
 import AddFabbisognoDialog from "@/app/components/warehouse/AddFabbisognoDialog";
 import AIBotWidget from "@/app/components/warehouse/AIBotWidget";
+import { supabase } from "@/app/lib/SupabaseClient";
 
 // Importiamo le funzioni create in precedenza
 import { getReordersByWarehouse, createReorder, updateReorderNotes, updateReorderStatus, updateReorderQuantity } from "@/app/warehouse/[id]/actions";
@@ -46,10 +47,11 @@ export default function FabbisognoContent({ warehouseId }: FabbisognoContentProp
     const [tempNoteText, setTempNoteText] = useState<string>("");
     const skipNextNoteBlurSave = useRef(false);
 
-    // 1. CARICAMENTO DATI DAL DB (FETCH)
+    // 1. CARICAMENTO DATI + REALTIME
     useEffect(() => {
+        if (!warehouseId) return;
+
         async function loadData() {
-            if (!warehouseId) return;
             setLoading(true);
             const { data, error } = await getReordersByWarehouse(warehouseId);
             if (!error && data) {
@@ -57,7 +59,47 @@ export default function FabbisognoContent({ warehouseId }: FabbisognoContentProp
             }
             setLoading(false);
         }
+
         loadData();
+
+        const channel = supabase
+            .channel(`reorders:${warehouseId}`)
+            .on(
+                "postgres_changes",
+                {
+                    event: "*",
+                    schema: "public",
+                    table: "reorders",
+                    filter: `warehouse_id=eq.${warehouseId}`,
+                },
+                (payload) => {
+                    if (payload.eventType === "INSERT") {
+                        const row = payload.new as FabbisognoItem;
+                        setItems((prev) =>
+                            prev.some((item) => item.id === row.id) ? prev : [row, ...prev]
+                        );
+                        return;
+                    }
+
+                    if (payload.eventType === "UPDATE") {
+                        const row = payload.new as FabbisognoItem;
+                        setItems((prev) =>
+                            prev.map((item) => (item.id === row.id ? row : item))
+                        );
+                        return;
+                    }
+
+                    if (payload.eventType === "DELETE") {
+                        const row = payload.old as { id: string };
+                        setItems((prev) => prev.filter((item) => item.id !== row.id));
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [warehouseId]);
 
     // 2. TOGGLE COMPLETATO / ATTIVO (MUTATION)
