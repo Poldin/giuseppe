@@ -109,6 +109,39 @@ CREATE TABLE public.reorders (
   edited_at timestamp with time zone,
   completed_at timestamp with time zone,
   warehouse_id uuid,
+  quantity integer,
   CONSTRAINT reorders_pkey PRIMARY KEY (id),
   CONSTRAINT reorders_warehouse_id_fkey FOREIGN KEY (warehouse_id) REFERENCES public.whearhouses(id)
+);
+CREATE TABLE public.product_search_chats (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  query_text text NOT NULL,
+  products jsonb NOT NULL DEFAULT '[]'::jsonb,
+  results jsonb NOT NULL DEFAULT '[]'::jsonb,
+  CONSTRAINT product_search_chats_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.ecommerce_brand (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  name text,
+  logo_url text,
+  other jsonb,
+  domain text,
+  CONSTRAINT ecommerce_brand_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.scraped_product (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  product_name text,
+  final_price real,
+  description text,
+  ecommerce_id uuid,
+  discount numeric,
+  other jsonb,
+  id_ecommerce text,
+  brand text,
+  update_at timestamp with time zone,
+  CONSTRAINT scraped_product_pkey PRIMARY KEY (id),
+  CONSTRAINT scraped_product_ecommerce_id_fkey FOREIGN KEY (ecommerce_id) REFERENCES public.ecommerce_brand(id)
 );
