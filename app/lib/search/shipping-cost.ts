@@ -95,3 +95,42 @@ export function buildShippingTiersMap(
     catalogo.map((ecom) => [ecom.id, ecom.shipping_tiers ?? []])
   );
 }
+
+export type ShippingHint = {
+  gap: number;
+  targetShipping: number;
+};
+
+export function buildShippingHints(
+  prezzoProdotti: number,
+  tiers: ShippingTier[]
+): ShippingHint[] {
+  if (prezzoProdotti <= 0 || tiers.length === 0) {
+    return [];
+  }
+
+  const currentShipping = calcolaSpedizione(prezzoProdotti, tiers);
+  const bestByTarget = new Map<number, number>();
+
+  for (const tier of tiers) {
+    if (tier.min_value <= prezzoProdotti) {
+      continue;
+    }
+
+    const gap = tier.min_value - prezzoProdotti;
+    const targetShipping = calcolaSpedizione(tier.min_value, tiers);
+
+    if (targetShipping >= currentShipping) {
+      continue;
+    }
+
+    const existing = bestByTarget.get(targetShipping);
+    if (existing == null || gap < existing) {
+      bestByTarget.set(targetShipping, gap);
+    }
+  }
+
+  return [...bestByTarget.entries()]
+    .map(([targetShipping, gap]) => ({ gap, targetShipping }))
+    .sort((a, b) => a.gap - b.gap);
+}

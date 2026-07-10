@@ -11,11 +11,11 @@ import {
   Eye,
   EyeOff,
   Loader2,
-  Minus,
   Plus,
   Trash2,
 } from "lucide-react";
 import { ProductSearchCombobox } from "@/app/components/home/ProductSearchCombobox";
+import { QuantityControl } from "@/app/components/chat/QuantityControl";
 import type { CardStateMap } from "@/app/lib/search/card-selection-state";
 import type {
   ProdottoOfferta,
@@ -87,72 +87,6 @@ function formatDiscountPercent(
   return new Intl.NumberFormat("it-IT", {
     maximumFractionDigits: Number.isInteger(discount) ? 0 : 1,
   }).format(discount);
-}
-
-function QuantityControl({
-  quantity,
-  onQuantityChange,
-}: {
-  quantity: number;
-  onQuantityChange: (next: number) => void;
-}) {
-  const [draft, setDraft] = useState(String(quantity));
-
-  useEffect(() => {
-    setDraft(String(quantity));
-  }, [quantity]);
-
-  const commitDraft = (raw: string) => {    const parsed = Number.parseInt(raw, 10);
-    const next = Number.isFinite(parsed) && parsed >= 1 ? parsed : 1;
-    onQuantityChange(next);
-    setDraft(String(next));
-  };
-
-  return (
-    <div className="inline-flex items-center rounded-lg border border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
-      <button
-        type="button"
-        onClick={() => {
-          const next = Math.max(1, quantity - 1);
-          onQuantityChange(next);
-          setDraft(String(next));
-        }}
-        disabled={quantity <= 1}
-        className="rounded-l-lg p-2.5 text-zinc-600 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-30 sm:p-1 dark:text-zinc-300 dark:hover:bg-zinc-800"
-        aria-label="Diminuisci quantità"
-      >
-        <Minus className="h-3.5 w-3.5" />
-      </button>
-      <input
-        type="text"
-        inputMode="numeric"
-        pattern="[0-9]*"
-        value={draft}
-        onChange={(event) => {
-          const next = event.target.value.replace(/\D/g, "");
-          setDraft(next);
-          if (next.length > 0) {
-            commitDraft(next);
-          }
-        }}
-        onBlur={() => commitDraft(draft)}
-        aria-label="Quantità"
-        className="w-10 border-0 bg-transparent py-2 text-center text-sm font-semibold tabular-nums text-zinc-900 outline-none dark:text-zinc-100"
-      />
-      <button
-        type="button"
-        onClick={() => {
-          const next = quantity + 1;
-          onQuantityChange(next);
-          setDraft(String(next));
-        }}
-        className="rounded-r-lg p-2.5 text-zinc-600 transition-colors hover:bg-zinc-100 sm:p-2 dark:text-zinc-300 dark:hover:bg-zinc-800"
-        aria-label="Aumenta quantità"
-      >
-        <Plus className="h-3.5 w-3.5" />
-      </button>
-    </div>
-  );
 }
 
 function MatchCardItem({
@@ -570,6 +504,7 @@ export function TopMatchPerReferenzaSection({
   onToggleSelected,
   onAddReferenza,
   onRemoveReferenza,
+  onRegisterScrollToReferenza,
   isAddingReferenza = false,
   isRemovingReferenza = false,
   addReferenzaError = null,
@@ -581,6 +516,7 @@ export function TopMatchPerReferenzaSection({
   onToggleSelected: (cardKey: string) => void;
   onAddReferenza?: (insertAfterIndex: number, productName: string) => void;
   onRemoveReferenza?: (queryIndex: number) => void;
+  onRegisterScrollToReferenza?: (fn: (queryIndex: number) => void) => void;
   isAddingReferenza?: boolean;
   isRemovingReferenza?: boolean;
   addReferenzaError?: string | null;
@@ -757,6 +693,29 @@ export function TopMatchPerReferenzaSection({
     }));
   };
 
+  const scrollToReferenza = useCallback((queryIndex: number) => {
+    setCollapsedRows((current) => ({
+      ...current,
+      [queryIndex]: false,
+    }));
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const element = document.getElementById(`referenza-${queryIndex}`);
+        if (!element) {
+          return;
+        }
+
+        element.scrollIntoView({ behavior: "smooth", block: "start" });
+        element.focus({ preventScroll: true });
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    onRegisterScrollToReferenza?.(scrollToReferenza);
+  }, [onRegisterScrollToReferenza, scrollToReferenza]);
+
   return (
     <section className="flex min-w-0 flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
@@ -798,7 +757,11 @@ export function TopMatchPerReferenzaSection({
 
           return (
             <div key={row.query_index} className="flex flex-col gap-3">
-              <article className="min-w-0 rounded-2xl border border-zinc-100 bg-zinc-100/70 p-4 dark:border-zinc-900 dark:bg-zinc-900/50 sm:p-5">
+              <article
+                id={`referenza-${row.query_index}`}
+                tabIndex={-1}
+                className="min-w-0 scroll-mt-24 rounded-2xl border border-zinc-100 bg-zinc-100/70 p-4 outline-none dark:border-zinc-900 dark:bg-zinc-900/50 sm:p-5"
+              >
                 <div className={isCollapsed ? "" : "mb-4"}>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                     <div className="flex shrink-0 items-center gap-2 self-end sm:order-2 sm:self-auto">

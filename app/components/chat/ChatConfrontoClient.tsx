@@ -4,7 +4,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { ArrowUpRight } from "lucide-react";
+
 import { TopMatchPerReferenzaSection } from "@/app/components/chat/TopMatchPerReferenzaSection";
+import { QuantityControl } from "@/app/components/chat/QuantityControl";
 
 import {
 
@@ -31,6 +34,7 @@ import { elaboraConfrontoUtente } from "@/app/lib/search/elabora-confronto-utent
 import { fetchEcommerceCatalog } from "@/app/lib/search/match-products";
 import {
   buildShippingTiersMap,
+  buildShippingHints,
   calcolaSpedizione,
   type ShippingTier,
 } from "@/app/lib/search/shipping-cost";
@@ -116,53 +120,99 @@ function ScenarioProductBadge({
 
   url,
 
+  quantita,
+
+  onNavigateToReferenza,
+
+  onQuantityChange,
+
 }: {
 
   productName: string;
 
   url: string | null;
 
+  quantita: number;
+
+  onNavigateToReferenza?: () => void;
+
+  onQuantityChange?: (next: number) => void;
+
 }) {
-
-  const className =
-
-    "inline-flex max-w-full items-center rounded-md bg-white px-2 py-1 text-xs font-medium leading-snug text-zinc-700 transition-colors  dark:bg-zinc-900 dark:text-zinc-200";
-
-
-
-  if (url) {
-
-    return (
-
-      <a
-
-        href={url}
-
-        target="_blank"
-
-        rel="noopener noreferrer"
-
-        className={`${className} hover:bg-zinc-50 dark:hover:bg-zinc-800`}
-
-      >
-
-        <span className="truncate">{productName}</span>
-
-      </a>
-
-    );
-
-  }
-
-
 
   return (
 
-    <span className={className}>
+    <div className="min-w-0 space-y-1.5">
 
-      <span className="truncate">{productName}</span>
+      {onNavigateToReferenza ? (
 
-    </span>
+        <button
+
+          type="button"
+
+          onClick={onNavigateToReferenza}
+
+          className="inline-block w-fit max-w-full rounded-md bg-white px-2 py-1 text-left text-xs font-medium leading-snug break-words text-zinc-700 transition-colors hover:text-zinc-900 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:text-zinc-100"
+
+        >
+
+          {productName}
+
+        </button>
+
+      ) : (
+
+        <span className="inline-block w-fit max-w-full rounded-md bg-white px-2 py-1 text-xs font-medium leading-snug break-words text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+
+          {productName}
+
+        </span>
+
+      )}
+
+      <div className="flex flex-wrap items-center gap-1.5">
+
+        {url ? (
+
+          <a
+
+            href={url}
+
+            target="_blank"
+
+            rel="noopener noreferrer"
+
+            className="inline-flex shrink-0 items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+
+            aria-label={`Apri ${productName} sul sito del negozio`}
+
+          >
+
+            vedi
+
+            <ArrowUpRight className="h-3.5 w-3.5" />
+
+          </a>
+
+        ) : null}
+
+        {onQuantityChange ? (
+
+          <QuantityControl
+
+            quantity={quantita}
+
+            onQuantityChange={onQuantityChange}
+
+            compact
+
+          />
+
+        ) : null}
+
+      </div>
+
+    </div>
 
   );
 
@@ -194,6 +244,12 @@ function ScenarioCard({
 
   tiersByEcommerce,
 
+  queryIndexByOffertaId,
+
+  onNavigateToReferenza,
+
+  onQuantityChange,
+
 }: {
 
   scenario: ScenarioCarrello;
@@ -201,6 +257,22 @@ function ScenarioCard({
   catalogById: Record<string, TabellaEcommerce>;
 
   tiersByEcommerce: Record<string, ShippingTier[]>;
+
+  queryIndexByOffertaId: Map<string, number>;
+
+  onNavigateToReferenza?: (queryIndex: number) => void;
+
+  onQuantityChange?: (input: {
+
+    queryIndex: number;
+
+    ecommerceId: string;
+
+    offertaId: string;
+
+    next: number;
+
+  }) => void;
 
 }) {
 
@@ -250,6 +322,11 @@ function ScenarioCard({
           );
 
           const prezzoSpedizioneEcom = calcolaSpedizione(
+            prezzoProdottiEcom,
+            tiersByEcommerce[ecomId] ?? []
+          );
+
+          const shippingHints = buildShippingHints(
             prezzoProdottiEcom,
             tiersByEcommerce[ecomId] ?? []
           );
@@ -307,51 +384,119 @@ function ScenarioCard({
                 )}
               </p>
 
-              <ul className="space-y-1 text-sm">
+              {shippingHints.length > 0 ? (
+                <div className="mb-2 flex flex-col items-start gap-1.5">
+                  {shippingHints.map((hint) => (
+                    <span
+                      key={`${hint.targetShipping}-${hint.gap}`}
+                      className="inline-flex max-w-full rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium leading-snug text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200"
+                    >
+                      ancora {formatPrice(hint.gap)} per {" "}
+                      {formatPrice(hint.targetShipping)} di spedizione
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+
+              <ul className="space-y-2">
 
                 {voci.map((voce) => (
 
-                  <li key={voce.offerta.id} className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
+                  <li
 
-                    <div className="min-w-0 flex-1">
+                    key={voce.offerta.id}
 
-                      <ScenarioProductBadge
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4"
+
+                  >
+
+                    <ScenarioProductBadge
 
                         productName={voce.offerta.product_name}
 
                         url={voce.offerta.original_url?.trim() || null}
 
-                      />
+                        quantita={voce.quantita}
 
-                    </div>
+                        onNavigateToReferenza={
 
-                    <span className="shrink-0 text-zinc-600 sm:text-right dark:text-zinc-400">
+                          onNavigateToReferenza
+
+                            ? () => {
+
+                                const queryIndex = queryIndexByOffertaId.get(
+
+                                  voce.offerta.id
+
+                                );
+
+                                if (queryIndex != null) {
+
+                                  onNavigateToReferenza(queryIndex);
+
+                                }
+
+                              }
+
+                            : undefined
+
+                        }
+
+                        onQuantityChange={
+
+                          onQuantityChange
+
+                            ? (next) => {
+
+                                const queryIndex = queryIndexByOffertaId.get(
+
+                                  voce.offerta.id
+
+                                );
+
+                                if (queryIndex == null) {
+
+                                  return;
+
+                                }
+
+                                onQuantityChange({
+
+                                  queryIndex,
+
+                                  ecommerceId: ecomId,
+
+                                  offertaId: voce.offerta.id,
+
+                                  next,
+
+                                });
+
+                              }
+
+                            : undefined
+
+                        }
+
+                    />
+
+                    <div className="shrink-0 text-right text-sm tabular-nums text-zinc-600 dark:text-zinc-400">
 
                       {voce.quantita > 1 ? (
 
-                        <span className="inline-flex items-center gap-2">
+                        <span className="whitespace-nowrap">
 
-                          <span className="inline-flex min-w-6 items-center justify-center rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                          × {formatPrice(voce.offerta.prezzo)} ={" "}
 
-                            {voce.quantita}
+                          <DiscountedPrice
 
-                          </span>
+                            amount={voce.prezzo_riga}
 
-                          <span className="text-sm tabular-nums">
+                            offerta={voce.offerta}
 
-                            × {formatPrice(voce.offerta.prezzo)} ={" "}
+                            className="font-semibold text-zinc-900 dark:text-zinc-100"
 
-                            <DiscountedPrice
-
-                              amount={voce.prezzo_riga}
-
-                              offerta={voce.offerta}
-
-                              className="font-semibold text-zinc-900 dark:text-zinc-100"
-
-                            />
-
-                          </span>
+                          />
 
                         </span>
 
@@ -367,7 +512,7 @@ function ScenarioCard({
 
                       )}
 
-                    </span>
+                    </div>
 
                   </li>
 
@@ -395,13 +540,203 @@ function ScenarioCard({
 
 
 
-function EcommerceTablesSection({
+function EcommerceRankingCard({
 
   tabelle,
+
+  onNavigateToEcommerceTable,
 
 }: {
 
   tabelle: TabellaEcommerce[];
+
+  onNavigateToEcommerceTable?: (ecommerceId: string) => void;
+
+}) {
+
+  const medalEmoji = ["🥇", "🥈", "🥉"] as const;
+
+  return (
+
+    <div className="overflow-hidden rounded-2xl">
+
+      <header className="bg-zinc-900 px-3 py-2.5 sm:px-4 sm:py-3 dark:bg-zinc-950">
+
+        <h3 className="text-base font-bold text-white sm:text-lg">
+
+          Classifica e-commerce
+
+        </h3>
+
+        <p className="mt-0.5 text-[11px] text-zinc-400 sm:text-xs">
+
+          scopri chi offre di più.
+
+        </p>
+
+      </header>
+
+
+
+      {tabelle.length === 0 ? (
+
+        <p className="p-6 text-center text-sm text-zinc-500">
+
+          Nessuna selezione attiva. Seleziona almeno un prodotto per referenza.
+
+        </p>
+
+      ) : (
+
+        <ul className="flex flex-col gap-2 p-3 sm:p-4">
+
+          {tabelle.map((tabella, index) => (
+
+            <li
+
+              key={tabella.ecommerce_id}
+
+              className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3 dark:border-zinc-800 dark:bg-zinc-900/40"
+
+            >
+
+              <div className="flex min-w-0 items-center gap-2">
+
+                {index < medalEmoji.length ? (
+
+                  <span className="shrink-0 text-base leading-none" aria-hidden="true">
+
+                    {medalEmoji[index]}
+
+                  </span>
+
+                ) : (
+
+                  <span className="inline-block w-5 shrink-0" aria-hidden="true" />
+
+                )}
+
+                <div className="inline-flex h-5 min-w-0 max-w-full items-center rounded-md bg-white px-2 py-0.5 ring-1 ring-zinc-100 dark:ring-zinc-800">
+
+                  {tabella.logo_url ? (
+
+                    // eslint-disable-next-line @next/next/no-img-element
+
+                    <img
+
+                      src={tabella.logo_url}
+
+                      alt={tabella.ecommerce_name}
+
+                      className="h-full w-auto max-w-full object-contain object-left"
+
+                    />
+
+                  ) : (
+
+                    <span className="text-xs font-bold uppercase text-zinc-600 dark:text-zinc-400">
+
+                      {tabella.ecommerce_name.slice(0, 2)}
+
+                    </span>
+
+                  )}
+
+                </div>
+
+              </div>
+
+
+
+              <div className="mt-2.5 flex items-start justify-between gap-3">
+
+                <div>
+
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+
+                    Copertura
+
+                  </p>
+
+                  <p className="mt-0.5 text-sm font-semibold tabular-nums">
+
+                    {tabella.copertura}/{tabella.copertura_totale}
+
+                  </p>
+
+                </div>
+
+                <div className="min-w-0 text-right">
+
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+
+                    Totale
+
+                  </p>
+
+                  <p className="mt-0.5 text-sm font-bold tabular-nums">
+
+                    {formatPrice(tabella.prezzo_totale)}
+
+                  </p>
+
+                  <p className="mt-0.5 text-[10px] leading-snug tabular-nums text-zinc-500 dark:text-zinc-400">
+
+                    prodotti {formatPrice(tabella.prezzo_prodotti)} · sped.{" "}
+
+                    {formatPrice(tabella.prezzo_spedizione)}
+
+                  </p>
+
+                </div>
+
+              </div>
+
+
+
+              <button
+
+                type="button"
+
+                onClick={() => onNavigateToEcommerceTable?.(tabella.ecommerce_id)}
+
+                className="mt-2.5 w-full rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+
+                aria-label={`Esplora il confronto ${tabella.ecommerce_name}`}
+
+              >
+
+                esplora
+
+              </button>
+
+            </li>
+
+          ))}
+
+        </ul>
+
+      )}
+
+    </div>
+
+  );
+
+}
+
+
+
+function EcommerceTablesSection({
+
+  tabelle,
+
+  onNavigateToReferenza,
+
+}: {
+
+  tabelle: TabellaEcommerce[];
+
+  onNavigateToReferenza?: (queryIndex: number) => void;
 
 }) {
 
@@ -447,7 +782,11 @@ function EcommerceTablesSection({
 
           key={tabella.ecommerce_id}
 
-          className="overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800"
+          id={`ecommerce-tabella-${tabella.ecommerce_id}`}
+
+          tabIndex={-1}
+
+          className="scroll-mt-24 overflow-hidden rounded-2xl border border-zinc-200 outline-none dark:border-zinc-800"
 
         >
 
@@ -521,7 +860,7 @@ function EcommerceTablesSection({
 
           <div className="overflow-x-auto">
 
-            <table className="min-w-full text-sm">
+            <table className="min-w-full text-sm [&_td]:whitespace-normal [&_th]:whitespace-normal">
 
               <thead>
 
@@ -557,13 +896,33 @@ function EcommerceTablesSection({
 
                   >
 
-                    <td className="px-3 py-2 align-top font-medium sm:px-5 sm:py-3">
+                    <td className="px-3 py-2 align-top font-medium break-words sm:px-5 sm:py-3">
 
-                      {riga.query_text}
+                      {onNavigateToReferenza ? (
+
+                        <button
+
+                          type="button"
+
+                          onClick={() => onNavigateToReferenza(riga.query_index)}
+
+                          className="text-left break-words transition-colors hover:text-zinc-600 dark:hover:text-zinc-300"
+
+                        >
+
+                          {riga.query_text}
+
+                        </button>
+
+                      ) : (
+
+                        riga.query_text
+
+                      )}
 
                     </td>
 
-                    <td className="px-3 py-2 align-top sm:px-5 sm:py-3">
+                    <td className="px-3 py-2 align-top break-words sm:px-5 sm:py-3">
 
                       {riga.trovato && riga.offerta ? (
 
@@ -914,12 +1273,120 @@ export function ChatConfrontoClient({
 
   const risparmioAssolutoRef = useRef<HTMLDivElement>(null);
 
+  const scrollToReferenzaRef = useRef<(queryIndex: number) => void>(() => {});
+
+  const queryIndexByOffertaId = useMemo(() => {
+
+    const map = new Map<string, number>();
+
+    for (const card of cards) {
+
+      map.set(card.offerta.id, card.queryIndex);
+
+    }
+
+    return map;
+
+  }, [cards]);
+
   const scrollToRisparmioAssoluto = useCallback(() => {
     const element = risparmioAssolutoRef.current;
     if (!element) return;
     element.scrollIntoView({ behavior: "smooth", block: "start" });
     element.focus({ preventScroll: true });
   }, []);
+
+  const scrollToReferenza = useCallback((queryIndex: number) => {
+
+    scrollToReferenzaRef.current(queryIndex);
+
+  }, []);
+
+  const handleScenarioQuantityChange = useCallback(
+
+    (input: {
+
+      queryIndex: number;
+
+      ecommerceId: string;
+
+      offertaId: string;
+
+      next: number;
+
+    }) => {
+
+      const cardKey = `${input.queryIndex}-${input.ecommerceId}-${input.offertaId}`;
+
+      setCardState((current) => {
+
+        const ui = current[cardKey] ?? {
+
+          hidden: false,
+
+          selected: true,
+
+          quantity: 1,
+
+        };
+
+        return {
+
+          ...current,
+
+          [cardKey]: {
+
+            ...ui,
+
+            quantity: Math.max(1, input.next),
+
+          },
+
+        };
+
+      });
+
+    },
+
+    []
+
+  );
+
+  const scrollToEcommerceTable = useCallback((ecommerceId: string) => {
+
+    window.requestAnimationFrame(() => {
+
+      const element = document.getElementById(
+
+        `ecommerce-tabella-${ecommerceId}`
+
+      );
+
+      if (!element) {
+
+        return;
+
+      }
+
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+
+      element.focus({ preventScroll: true });
+
+    });
+
+  }, []);
+
+  const handleRegisterScrollToReferenza = useCallback(
+
+    (fn: (queryIndex: number) => void) => {
+
+      scrollToReferenzaRef.current = fn;
+
+    },
+
+    []
+
+  );
 
   const handleRemoveReferenza = useCallback(
 
@@ -1027,30 +1494,43 @@ export function ChatConfrontoClient({
         </span>
       </button>
 
-      <section className="grid min-w-0 gap-4 md:grid-cols-2">
+      <section className="grid min-w-0 gap-4 md:grid-cols-10">
 
         <div
           ref={risparmioAssolutoRef}
           id="scenario-risparmio-assoluto"
           tabIndex={-1}
-          className="scroll-mt-24 outline-none"
+          className="scroll-mt-24 outline-none md:col-span-7"
         >
           <ScenarioCard
+
             scenario={calcolo.scenario_risparmio}
+
             catalogById={catalogById}
+
             tiersByEcommerce={tiersByEcommerce}
+
+            queryIndexByOffertaId={queryIndexByOffertaId}
+
+            onNavigateToReferenza={scrollToReferenza}
+
+            onQuantityChange={handleScenarioQuantityChange}
+
           />
+
         </div>
 
-        <ScenarioCard
+        <div className="min-w-0 md:col-span-3">
 
-          scenario={calcolo.scenario_monopolista}
+          <EcommerceRankingCard
 
-          catalogById={catalogById}
+            tabelle={calcolo.tabelle_ecommerce}
 
-          tiersByEcommerce={tiersByEcommerce}
+            onNavigateToEcommerceTable={scrollToEcommerceTable}
 
-        />
+          />
+
+        </div>
 
       </section>
 
@@ -1061,6 +1541,8 @@ export function ChatConfrontoClient({
         cardState={cardState}
 
         onCardStateChange={setCardState}
+
+        onRegisterScrollToReferenza={handleRegisterScrollToReferenza}
 
         onToggleSelected={(cardKey) => {
 
@@ -1094,7 +1576,13 @@ export function ChatConfrontoClient({
 
       />
 
-      <EcommerceTablesSection tabelle={calcolo.tabelle_ecommerce} />
+      <EcommerceTablesSection
+
+        tabelle={calcolo.tabelle_ecommerce}
+
+        onNavigateToReferenza={scrollToReferenza}
+
+      />
 
     </div>
 
