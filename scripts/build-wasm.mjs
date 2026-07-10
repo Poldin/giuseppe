@@ -33,6 +33,17 @@ function run(command, args, options = {}) {
   }
 }
 
+function pkgArtifactsReady() {
+  const pkgDir = path.join(root, "rust/search-engine/pkg");
+  const required = [
+    "search_engine.js",
+    "search_engine_bg.wasm",
+    "search_engine.d.ts",
+    "package.json",
+  ];
+  return required.every((file) => fs.existsSync(path.join(pkgDir, file)));
+}
+
 function patchWasmPath() {
   const pkgDir = path.join(root, "rust/search-engine/pkg");
   const file = path.join(pkgDir, "search_engine.js");
@@ -68,10 +79,20 @@ const wasmBytes = require('fs').readFileSync(wasmPath);`;
 }
 
 if (!fs.existsSync(cargoExe)) {
+  if (pkgArtifactsReady()) {
+    console.log(
+      "Rust/Cargo non trovato — uso artefatti WASM già presenti in rust/search-engine/pkg."
+    );
+    patchWasmPath();
+    console.log("build:wasm completato (artefatti precompilati).");
+    process.exit(0);
+  }
+
   console.error(
     [
       "Rust/Cargo non trovato in ~/.cargo/bin.",
-      "Installa da https://rustup.rs/ poi riapri il terminale.",
+      "Installa da https://rustup.rs/ poi esegui: npm run build:wasm",
+      "Oppure committa gli artefatti in rust/search-engine/pkg/ (senza .gitignore).",
     ].join("\n")
   );
   process.exit(1);
