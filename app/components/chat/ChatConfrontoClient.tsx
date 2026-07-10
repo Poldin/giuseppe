@@ -1027,6 +1027,33 @@ export function ChatConfrontoClient({
         </span>
       </button>
 
+      <section className="grid min-w-0 gap-4 md:grid-cols-2">
+
+        <div
+          ref={risparmioAssolutoRef}
+          id="scenario-risparmio-assoluto"
+          tabIndex={-1}
+          className="scroll-mt-24 outline-none"
+        >
+          <ScenarioCard
+            scenario={calcolo.scenario_risparmio}
+            catalogById={catalogById}
+            tiersByEcommerce={tiersByEcommerce}
+          />
+        </div>
+
+        <ScenarioCard
+
+          scenario={calcolo.scenario_monopolista}
+
+          catalogById={catalogById}
+
+          tiersByEcommerce={tiersByEcommerce}
+
+        />
+
+      </section>
+
       <TopMatchPerReferenzaSection
 
         confronto={confronto}
@@ -1066,33 +1093,6 @@ export function ChatConfrontoClient({
         removeReferenzaError={removeReferenzaError}
 
       />
-
-      <section className="grid min-w-0 gap-4 md:grid-cols-2">
-
-        <div
-          ref={risparmioAssolutoRef}
-          id="scenario-risparmio-assoluto"
-          tabIndex={-1}
-          className="scroll-mt-24 outline-none"
-        >
-          <ScenarioCard
-            scenario={calcolo.scenario_risparmio}
-            catalogById={catalogById}
-            tiersByEcommerce={tiersByEcommerce}
-          />
-        </div>
-
-        <ScenarioCard
-
-          scenario={calcolo.scenario_monopolista}
-
-          catalogById={catalogById}
-
-          tiersByEcommerce={tiersByEcommerce}
-
-        />
-
-      </section>
 
       <EcommerceTablesSection tabelle={calcolo.tabelle_ecommerce} />
 

@@ -762,7 +762,7 @@ export function TopMatchPerReferenzaSection({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Aggiusta le quantità e seleziona le soluzioni migliori per ogni referenza: noi ti proponiamo l'acquisto migliore.
+            Aggiusta le quantità e seleziona le soluzioni migliori per ogni referenza: noi aggiorniamo l'acquisto migliore!
           </p>
         </div>
 
