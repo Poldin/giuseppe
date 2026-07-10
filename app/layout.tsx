@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+// 1. Importa il componente di Vercel
+import { Analytics } from "@vercel/analytics/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,7 +29,11 @@ export default function RootLayout({
       lang="it"
       className={`${geistSans.variable} ${geistMono.variable} h-full w-full overflow-x-clip antialiased`}
     >
-      <body className="flex min-h-full w-full min-w-0 flex-col overflow-x-clip">{children}</body>
+      <body className="flex min-h-full w-full min-w-0 flex-col overflow-x-clip">
+        {children}
+        {/* 2. Inserisci il componente qui */}
+        <Analytics />
+      </body>
     </html>
   );
 }
