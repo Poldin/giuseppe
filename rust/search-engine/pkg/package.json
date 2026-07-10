@@ -1,0 +1,13 @@
+{
+  "name": "search-engine",
+  "description": "Motore combinatorio confronto prezzi e-commerce (WASM/Node)",
+  "version": "0.1.0",
+  "license": "MIT",
+  "files": [
+    "search_engine_bg.wasm",
+    "search_engine.js",
+    "search_engine.d.ts"
+  ],
+  "main": "search_engine.js",
+  "types": "search_engine.d.ts"
+}

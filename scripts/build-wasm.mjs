@@ -33,8 +33,10 @@ function run(command, args, options = {}) {
   }
 }
 
+const pkgDir = path.join(root, "rust/search-engine/pkg");
+const pkgGitignore = path.join(pkgDir, ".gitignore");
+
 function pkgArtifactsReady() {
-  const pkgDir = path.join(root, "rust/search-engine/pkg");
   const required = [
     "search_engine.js",
     "search_engine_bg.wasm",
@@ -44,8 +46,14 @@ function pkgArtifactsReady() {
   return required.every((file) => fs.existsSync(path.join(pkgDir, file)));
 }
 
+function removePkgGitignore() {
+  // wasm-pack crea .gitignore con "*" — impedisce il commit degli artefatti su Vercel.
+  if (fs.existsSync(pkgGitignore)) {
+    fs.unlinkSync(pkgGitignore);
+  }
+}
+
 function patchWasmPath() {
-  const pkgDir = path.join(root, "rust/search-engine/pkg");
   const file = path.join(pkgDir, "search_engine.js");
 
   if (!fs.existsSync(file)) {
@@ -127,4 +135,5 @@ if (fs.existsSync(wasmPackExe)) {
 }
 
 patchWasmPath();
+removePkgGitignore();
 console.log("build:wasm completato.");
