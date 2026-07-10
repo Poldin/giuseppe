@@ -546,15 +546,21 @@ function EcommerceRankingCard({
 
   onNavigateToEcommerceTable,
 
+  onExploreAll,
+
 }: {
 
   tabelle: TabellaEcommerce[];
 
   onNavigateToEcommerceTable?: (ecommerceId: string) => void;
 
+  onExploreAll?: () => void;
+
 }) {
 
   const medalEmoji = ["🥇", "🥈", "🥉"] as const;
+
+  const topTabelle = tabelle.slice(0, 3);
 
   return (
 
@@ -590,7 +596,7 @@ function EcommerceRankingCard({
 
         <ul className="flex flex-col gap-2 p-3 sm:p-4">
 
-          {tabelle.map((tabella, index) => (
+          {topTabelle.map((tabella, index) => (
 
             <li
 
@@ -602,19 +608,11 @@ function EcommerceRankingCard({
 
               <div className="flex min-w-0 items-center gap-2">
 
-                {index < medalEmoji.length ? (
+                <span className="shrink-0 text-base leading-none" aria-hidden="true">
 
-                  <span className="shrink-0 text-base leading-none" aria-hidden="true">
+                  {medalEmoji[index]}
 
-                    {medalEmoji[index]}
-
-                  </span>
-
-                ) : (
-
-                  <span className="inline-block w-5 shrink-0" aria-hidden="true" />
-
-                )}
+                </span>
 
                 <div className="inline-flex h-5 min-w-0 max-w-full items-center rounded-md bg-white px-2 py-0.5 ring-1 ring-zinc-100 dark:ring-zinc-800">
 
@@ -714,6 +712,30 @@ function EcommerceRankingCard({
 
           ))}
 
+          {onExploreAll ? (
+
+            <li>
+
+              <button
+
+                type="button"
+
+                onClick={onExploreAll}
+
+                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+
+                aria-label="Esplora tutti gli e-commerce in fondo alla pagina"
+
+              >
+
+                esplora tutti
+
+              </button>
+
+            </li>
+
+          ) : null}
+
         </ul>
 
       )}
@@ -742,7 +764,15 @@ function EcommerceTablesSection({
 
   return (
 
-    <section className="flex min-w-0 flex-col gap-6">
+    <section
+
+      id="confronto-ecommerce"
+
+      tabIndex={-1}
+
+      className="scroll-mt-24 flex min-w-0 flex-col gap-6 outline-none"
+
+    >
 
       <div>
 
@@ -1376,6 +1406,22 @@ export function ChatConfrontoClient({
 
   }, []);
 
+  const scrollToAllEcommerce = useCallback(() => {
+
+    const element = document.getElementById("confronto-ecommerce");
+
+    if (!element) {
+
+      return;
+
+    }
+
+    element.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    element.focus({ preventScroll: true });
+
+  }, []);
+
   const handleRegisterScrollToReferenza = useCallback(
 
     (fn: (queryIndex: number) => void) => {
@@ -1527,6 +1573,8 @@ export function ChatConfrontoClient({
             tabelle={calcolo.tabelle_ecommerce}
 
             onNavigateToEcommerceTable={scrollToEcommerceTable}
+
+            onExploreAll={scrollToAllEcommerce}
 
           />
 
