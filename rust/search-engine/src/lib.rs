@@ -14,6 +14,8 @@ pub struct SupabaseMatch {
     pub original_url: Option<String>,
     #[serde(default)]
     pub discount: Option<f32>,
+    #[serde(default)]
+    pub brand: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,6 +45,8 @@ pub struct ProdottoOfferta {
     pub original_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub discount: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub brand: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -268,6 +272,7 @@ fn prodotto_offerta_from_match(m: &SupabaseMatch) -> ProdottoOfferta {
         similarity: m.similarity,
         original_url: m.original_url.clone(),
         discount: m.discount,
+        brand: m.brand.clone(),
     }
 }
 

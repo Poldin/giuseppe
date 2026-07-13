@@ -28,14 +28,14 @@ export async function enrichMatchesWithProductUrls(
 
   const detailsById = new Map<
     string,
-    { original_url: string | null; discount: number | null }
+    { original_url: string | null; discount: number | null; brand: string | null }
   >();
 
   for (let index = 0; index < ids.length; index += PRODUCT_URL_CHUNK_SIZE) {
     const chunk = ids.slice(index, index + PRODUCT_URL_CHUNK_SIZE);
     const { data, error } = await supabase
       .from("scraped_product")
-      .select("id, other, discount")
+      .select("id, other, discount, brand")
       .in("id", chunk);
 
     if (error) {
@@ -49,9 +49,16 @@ export async function enrichMatchesWithProductUrls(
           ? null
           : Number(discountRaw);
 
+      const brandRaw = row.brand;
+      const brand =
+        typeof brandRaw === "string" && brandRaw.trim().length > 0
+          ? brandRaw.trim()
+          : null;
+
       detailsById.set(String(row.id), {
         original_url: parseOriginalUrl(row.other),
         discount: discount != null && discount > 0 ? discount : null,
+        brand,
       });
     }
   }
@@ -62,6 +69,7 @@ export async function enrichMatchesWithProductUrls(
       ...match,
       original_url: details?.original_url ?? match.original_url ?? null,
       discount: details?.discount ?? match.discount ?? null,
+      brand: details?.brand ?? match.brand ?? null,
     };
   });
 }

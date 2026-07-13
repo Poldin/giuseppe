@@ -7,6 +7,7 @@ export type SupabaseMatch = {
   similarity: number;
   original_url?: string | null;
   discount?: number | null;
+  brand?: string | null;
 };
 
 export type { ShippingTier } from "@/app/lib/search/shipping-cost";
@@ -28,6 +29,7 @@ export type ProdottoOfferta = {
   similarity: number;
   original_url?: string | null;
   discount?: number | null;
+  brand?: string | null;
 };
 
 export type VoceOrdine = {

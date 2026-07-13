@@ -118,6 +118,8 @@ function ScenarioProductBadge({
 
   productName,
 
+  brand,
+
   url,
 
   quantita,
@@ -129,6 +131,8 @@ function ScenarioProductBadge({
 }: {
 
   productName: string;
+
+  brand?: string | null;
 
   url: string | null;
 
@@ -171,6 +175,16 @@ function ScenarioProductBadge({
       )}
 
       <div className="flex flex-wrap items-center gap-1.5">
+
+        {brand ? (
+
+          <span className="inline-flex shrink-0 items-center rounded-md border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300">
+
+            {brand}
+
+          </span>
+
+        ) : null}
 
         {url ? (
 
@@ -413,6 +427,8 @@ function ScenarioCard({
                     <ScenarioProductBadge
 
                         productName={voce.offerta.product_name}
+
+                        brand={voce.offerta.brand}
 
                         url={voce.offerta.original_url?.trim() || null}
 
