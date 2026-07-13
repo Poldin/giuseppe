@@ -100,18 +100,6 @@ export function EcommerceRankingCard({
               </button>
             </li>
           ))}
-          {onExploreAll ? (
-            <li>
-              <button
-                type="button"
-                onClick={onExploreAll}
-                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                aria-label="Esplora tutti gli e-commerce in fondo alla pagina"
-              >
-                esplora tutti
-              </button>
-            </li>
-          ) : null}
         </ul>
       )}
     </div>

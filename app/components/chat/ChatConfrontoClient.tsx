@@ -188,6 +188,7 @@ export function ChatConfrontoClient({
 
   const risparmioAssolutoRef = useRef<HTMLDivElement>(null);
   const scrollToReferenzaRef = useRef<(queryIndex: number) => void>(() => {});
+  const openAddReferenzaRef = useRef<() => void>(() => {});
 
   const queryIndexByOffertaId = useMemo(() => {
     const map = new Map<string, number>();
@@ -264,6 +265,10 @@ export function ChatConfrontoClient({
     },
     []
   );
+
+  const handleRegisterOpenAddReferenza = useCallback((fn: () => void) => {
+    openAddReferenzaRef.current = fn;
+  }, []);
 
   const handleRemoveReferenza = useCallback(
     async (queryIndex: number) => {
@@ -344,12 +349,8 @@ export function ChatConfrontoClient({
             }}
             isRemovingReferenza={isRemovingReferenza}
             canRemoveReferenza={confronto.prodotti_richiesti.length > 1}
-            onAddReferenza={(insertAfterIndex, productName) => {
-              void handleAddReferenza(insertAfterIndex, productName);
-            }}
+            onOpenAddReferenza={() => openAddReferenzaRef.current()}
             isAddingReferenza={isAddingReferenza}
-            addReferenzaError={addReferenzaError}
-            addReferenzaAfterIndex={confronto.prodotti_richiesti.length - 1}
           />
         </div>
 
@@ -367,6 +368,7 @@ export function ChatConfrontoClient({
         cardState={cardState}
         onCardStateChange={setCardState}
         onRegisterScrollToReferenza={handleRegisterScrollToReferenza}
+        onRegisterOpenAddReferenza={handleRegisterOpenAddReferenza}
         onToggleSelected={(cardKey) => {
           const card = cards.find((item) => item.key === cardKey);
           if (!card) return;

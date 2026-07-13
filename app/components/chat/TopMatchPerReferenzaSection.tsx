@@ -217,7 +217,7 @@ function MatchCardItem({
           </a>
         ) : null}
 
-        {onAddAsReferenza ? (
+        {onAddAsReferenza && !isSelected ? (
           <button
             type="button"
             onClick={() => onAddAsReferenza(candidato.product_name)}
@@ -522,66 +522,48 @@ export function AddReferenzaInlineRow({
   error: string | null;
 }) {
   const [query, setQuery] = useState("");
-  const [selectedName, setSelectedName] = useState("");
 
   const handleSelect = (productName: string) => {
     const trimmed = productName.trim();
-    if (!trimmed) return;
-    setSelectedName(trimmed);
-    setQuery(trimmed);
-  };
-
-  const handleConfirm = () => {
-    const name = (selectedName || query).trim();
-    if (!name || isSubmitting) return;
-    onConfirm(name);
+    if (!trimmed || isSubmitting) return;
+    onConfirm(trimmed);
   };
 
   return (
     <div className="mx-auto w-full max-w-lg text-left">
-      <ProductSearchCombobox
-        value={query}
-        onChange={(value) => {
-          setQuery(value);
-          setSelectedName("");
-        }}
-        onSelect={handleSelect}
-        onAddFromInput={() => {
-          if (query.trim()) handleSelect(query);
-        }}
-        disabled={isSubmitting}
-        autoFocus
-        placeholder="Cerca un prodotto..."
-      />
-
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-2">
-        {error ? (
-          <p className="text-sm text-red-600 sm:mr-auto dark:text-red-400">{error}</p>
-        ) : null}
+      <div className="flex items-center gap-2">
+        <ProductSearchCombobox
+          value={query}
+          onChange={setQuery}
+          onSelect={handleSelect}
+          onAddFromInput={() => {
+            if (query.trim()) handleSelect(query);
+          }}
+          disabled={isSubmitting}
+          autoFocus
+          placeholder="Cerca un prodotto..."
+          className="min-w-0 flex-1"
+        />
         <button
           type="button"
           onClick={onCancel}
           disabled={isSubmitting}
-          className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          className="shrink-0 rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
         >
-          Annulla
-        </button>
-        <button
-          type="button"
-          onClick={handleConfirm}
-          disabled={isSubmitting || !(selectedName || query).trim()}
-          className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200"
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Aggiunta...
-            </>
-          ) : (
-            "OK"
-          )}
+          annulla
         </button>
       </div>
+
+      {isSubmitting ? (
+        <p className="mt-2 flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Aggiunta...
+        </p>
+      ) : null}
+
+      {error ? (
+        <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
+      ) : null}
     </div>
   );
 }
@@ -594,6 +576,7 @@ export function TopMatchPerReferenzaSection({
   onAddReferenza,
   onRemoveReferenza,
   onRegisterScrollToReferenza,
+  onRegisterOpenAddReferenza,
   isAddingReferenza = false,
   isRemovingReferenza = false,
   addReferenzaError = null,
@@ -606,6 +589,7 @@ export function TopMatchPerReferenzaSection({
   onAddReferenza?: (insertAfterIndex: number, productName: string) => void;
   onRemoveReferenza?: (queryIndex: number) => void;
   onRegisterScrollToReferenza?: (fn: (queryIndex: number) => void) => void;
+  onRegisterOpenAddReferenza?: (fn: () => void) => void;
   isAddingReferenza?: boolean;
   isRemovingReferenza?: boolean;
   addReferenzaError?: string | null;
@@ -625,6 +609,7 @@ export function TopMatchPerReferenzaSection({
   const [deleteArmedIndex, setDeleteArmedIndex] = useState<number | null>(null);
   const prevAddingReferenza = useRef(isAddingReferenza);
   const prevRemovingReferenza = useRef(isRemovingReferenza);
+  const pendingScrollToAddRef = useRef<number | null>(null);
 
   const canRemoveReferenza = confronto.prodotti_richiesti.length > 1;
 
@@ -797,12 +782,62 @@ export function TopMatchPerReferenzaSection({
     onRegisterScrollToReferenza?.(scrollToReferenza);
   }, [onRegisterScrollToReferenza, scrollToReferenza]);
 
+  const focusAddReferenzaInput = useCallback((queryIndex: number) => {
+    const element = document.getElementById(`add-referenza-after-${queryIndex}`);
+    const input = element?.querySelector(
+      'input[type="text"]'
+    ) as HTMLInputElement | null;
+    input?.focus({ preventScroll: true });
+  }, []);
+
+  useEffect(() => {
+    if (addingAfterIndex === null) {
+      return;
+    }
+
+    const element = document.getElementById(
+      `add-referenza-after-${addingAfterIndex}`
+    );
+    if (!element) {
+      return;
+    }
+
+    if (pendingScrollToAddRef.current === addingAfterIndex) {
+      pendingScrollToAddRef.current = null;
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+
+      const timer = window.setTimeout(() => {
+        focusAddReferenzaInput(addingAfterIndex);
+      }, 400);
+
+      return () => window.clearTimeout(timer);
+    }
+
+    focusAddReferenzaInput(addingAfterIndex);
+  }, [addingAfterIndex, focusAddReferenzaInput]);
+
+  const openAddReferenzaAtEnd = useCallback(() => {
+    const lastRow = rowsWithCards[rowsWithCards.length - 1];
+    if (!lastRow || !onAddReferenza) {
+      return;
+    }
+
+    const queryIndex = lastRow.row.query_index;
+    pendingScrollToAddRef.current = queryIndex;
+    setAddingAfterIndex(queryIndex);
+    setDeleteArmedIndex(null);
+  }, [onAddReferenza, rowsWithCards]);
+
+  useEffect(() => {
+    onRegisterOpenAddReferenza?.(openAddReferenzaAtEnd);
+  }, [onRegisterOpenAddReferenza, openAddReferenzaAtEnd]);
+
   return (
     <section className="flex min-w-0 flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Aggiusta le quantità e seleziona le soluzioni migliori per ogni referenza: noi aggiorniamo l'acquisto migliore!
+            Seleziona i prodotti migliori per ogni tua esigenza.
           </p>
         </div>
 
@@ -921,31 +956,37 @@ export function TopMatchPerReferenzaSection({
               </article>
 
               {onAddReferenza ? (
-                addingAfterIndex === row.query_index ? (
-                  <AddReferenzaInlineRow
-                    onConfirm={(productName) => {
-                      onAddReferenza(row.query_index, productName);
-                    }}
-                    onCancel={() => setAddingAfterIndex(null)}
-                    isSubmitting={isAddingReferenza}
-                    error={addReferenzaError}
-                  />
-                ) : (
-                  <div className="flex justify-start">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAddingAfterIndex(row.query_index);
-                        setDeleteArmedIndex(null);
+                <div
+                  id={`add-referenza-after-${row.query_index}`}
+                  tabIndex={-1}
+                  className="scroll-mt-24 outline-none"
+                >
+                  {addingAfterIndex === row.query_index ? (
+                    <AddReferenzaInlineRow
+                      onConfirm={(productName) => {
+                        onAddReferenza(row.query_index, productName);
                       }}
-                      disabled={isAddingReferenza || addingAfterIndex !== null}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:bg-zinc-800"
-                    >
-                      <Plus className="h-4 w-4" />
-                      aggiungi prodotto 🔎
-                    </button>
-                  </div>
-                )
+                      onCancel={() => setAddingAfterIndex(null)}
+                      isSubmitting={isAddingReferenza}
+                      error={addReferenzaError}
+                    />
+                  ) : (
+                    <div className="flex justify-start">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAddingAfterIndex(row.query_index);
+                          setDeleteArmedIndex(null);
+                        }}
+                        disabled={isAddingReferenza || addingAfterIndex !== null}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-light text-zinc-600 transition-colors hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:bg-zinc-800"
+                      >
+                        <Plus className="h-4 w-4" />
+                        aggiungi prodotto 🔎
+                      </button>
+                    </div>
+                  )}
+                </div>
               ) : null}
             </div>
           );

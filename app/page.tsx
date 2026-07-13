@@ -1,55 +1,65 @@
 import HomeSearchBox from "@/app/components/home/HomeSearchBox";
+import { HomeEcommerceBadges } from "@/app/components/home/HomeEcommerceBadges";
+import { fetchEcommerceCatalog } from "@/app/lib/search/match-products";
 import Image from "next/image";
 
 const STEPS = [
   {
-    title: "Scrivimi su WhatsApp",
+    title: "Cosa ti serve?",
     description:
-      "Dimmi cosa ti interessa e ti apro subito la tua lista dinamica dedicata.",
+      "indica la lista dei prodotti che ti servono in Studio.",
   },
   {
-    title: "La lista dinamica",
+    title: "Lasciami comparare prezzi e prodotti",
     description:
-      "È il tuo elenco personalizzato di ciò che ti serve: serve a sapere sempre di cosa hai bisogno.",
+      "Faccio una ricerca sui principali rivenditori e ti mostro le migliori offerte.",
   },
   {
-    title: "Tu parli, io organizzo",
+    title: "Modifica e migliora la ricerca",
     description:
-      "Mentre mi scrivi, mi mandi audio o foto, tengo in ordine la lista per te.",
+      "Seleziona i prodotti migliori per ogni tua esigenza e componi il tuo ordine migliore.",
   },
   {
-    title: "Offerte su misura",
+    title: "Acquista in tutta sicurezza dai rivenditori.",
     description:
-      "Cerco le migliori proposte dai rivenditori partner e te le mando. Ti piace? Compri. Non ti piace? Non compri.",
+      "Io ti aiuto a a trovare la migliore combinazione di prodotti e prezzi: acquista in tutta sicurezza dai rivenditori.",
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const ecommerces = await fetchEcommerceCatalog();
+
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans">
       <main className="mx-auto max-w-lg px-6 py-2">
         {/* Hero */}
-        <section className="flex flex-col items-center gap-4 text-center">
-          <div className="flex flex-col gap-1">
-            <p className="text-lg text-zinc-600 dark:text-zinc-400 sm:text-xl">
-              Ciao👋 io sono
-            </p>
-            <h1 className="text-4xl font-black uppercase tracking-tighter sm:text-5xl">
-              Giuseppe
-            </h1>
-          </div>
-          <div className="relative h-40 w-40 overflow-hidden rounded-full bg-zinc-100 shadow-xl ring-4 ring-zinc-900/5 dark:bg-zinc-900 dark:ring-zinc-100/10 sm:h-48 sm:w-48">
-            <Image
-              src="/giuseppe.jpeg"
-              alt="Giuseppe"
-              fill
-              className="object-cover"
-              priority
-            />
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center gap-4">
+            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-zinc-100 shadow-xl ring-4 ring-zinc-900/5 dark:bg-zinc-900 dark:ring-zinc-100/10 sm:h-24 sm:w-24">
+              <Image
+                src="/giuseppe.jpeg"
+                alt="Giuseppe"
+                fill
+                className="object-cover"
+                priority
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <p className="text-lg text-zinc-600 dark:text-zinc-400 sm:text-xl">
+                Ciao👋 io sono
+              </p>
+              <h1 className="text-4xl font-black uppercase tracking-tighter sm:text-5xl">
+                Giuseppe
+              </h1>
+            </div>
           </div>
 
-
-          <HomeSearchBox />
+          <p className="text-base leading-relaxed text-zinc-600 dark:text-zinc-400 sm:text-lg">
+            trovo le migliori offerte per prodotti odontoiatrici.
+          </p>
+          <div className="mt-5">
+            <HomeSearchBox />
+          </div>
         </section>
 
         {/* Come funziona */}
@@ -75,6 +85,8 @@ export default function Home() {
           </ol>
         </section>
 
+        <HomeEcommerceBadges ecommerces={ecommerces} />
+
         {/* Pagamento */}
         <section className="mt-16 rounded-2xl border border-zinc-100 bg-zinc-50 p-6 dark:border-zinc-800 dark:bg-zinc-900/50">
           <h2 className="mb-4 text-2xl font-black uppercase tracking-tighter sm:text-3xl">
@@ -87,10 +99,6 @@ export default function Home() {
                 gratuito
               </span>{" "}
               per gli studi dentistici.
-            </p>
-            <p>
-              Guadagna dalle commissioni sugli acquisti, in partnership con
-              dealer e rivenditori.
             </p>
           </div>
         </section>
