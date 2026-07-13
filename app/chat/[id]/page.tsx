@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChatConfrontoClient } from "@/app/components/chat/ChatConfrontoClient";
+import { HowItWorksButton } from "@/app/components/onboarding/HowItWorksButton";
 import { getProductSearchChat } from "@/app/lib/search/chat-store";
 import type { RisultatoConfronto } from "@/app/lib/search/elabora-scenari";
 import type { ProductSearchResult } from "@/app/lib/search/types";
@@ -102,6 +103,7 @@ export default async function ChatPage({ params }: ChatPageProps) {
           <h1 className="text-3xl font-black uppercase tracking-tighter sm:text-4xl">
             Risultati
           </h1>
+          <HowItWorksButton />
         </div>
 
         {confronto ? (

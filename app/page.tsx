@@ -1,5 +1,6 @@
 import HomeSearchBox from "@/app/components/home/HomeSearchBox";
 import { HomeEcommerceBadges } from "@/app/components/home/HomeEcommerceBadges";
+import { HowItWorksButton } from "@/app/components/onboarding/HowItWorksButton";
 import { fetchEcommerceCatalog } from "@/app/lib/search/match-products";
 import Image from "next/image";
 
@@ -57,6 +58,7 @@ export default async function Home() {
           <p className="text-base leading-relaxed text-zinc-600 dark:text-zinc-400 sm:text-lg">
             confronto prezzi e prodotti per studi dentistici
           </p>
+          <HowItWorksButton />
           <div className="mt-5">
             <HomeSearchBox />
           </div>
