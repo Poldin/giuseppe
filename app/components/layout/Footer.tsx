@@ -1,12 +1,13 @@
 "use client";
 
 import { ImproveGiuseppeDialog } from "@/app/components/feedback/ImproveGiuseppeDialog";
+import { HowItWorksDialog } from "@/app/components/onboarding/HowItWorksDialog";
 import Image from "next/image";
-import Link from "next/link";
 import { useState } from "react";
 
 export function Footer() {
   const [improveOpen, setImproveOpen] = useState(false);
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
 
   return (
     <>
@@ -32,12 +33,13 @@ export function Footer() {
           </div>
 
           <nav className="flex flex-col items-start gap-2">
-            <Link
-              href="/#come-funziona"
+            <button
+              type="button"
+              onClick={() => setHowItWorksOpen(true)}
               className="w-fit rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 dark:border-transparent dark:bg-zinc-900 dark:font-semibold dark:text-white dark:hover:bg-zinc-800"
             >
               Come funziona?
-            </Link>
+            </button>
             <button
               type="button"
               onClick={() => setImproveOpen(true)}
@@ -50,6 +52,10 @@ export function Footer() {
       </footer>
 
       <ImproveGiuseppeDialog open={improveOpen} onOpenChange={setImproveOpen} />
+      <HowItWorksDialog
+        open={howItWorksOpen}
+        onOpenChange={setHowItWorksOpen}
+      />
     </>
   );
 }

@@ -109,20 +109,16 @@ export function ImproveGiuseppeDialog({
             transition={{ type: "spring", damping: 28, stiffness: 320 }}
             className="flex h-full min-h-0 flex-col"
           >
-            <header className="flex shrink-0 items-center justify-between border-b border-zinc-100 px-4 py-4 dark:border-zinc-900 sm:px-6">
-              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                Giuseppe
-              </p>
+            <div className="relative flex h-full min-h-0 flex-col">
               <button
                 type="button"
                 onClick={handleClose}
                 disabled={isSubmitting}
                 aria-label="Chiudi"
-                className="rounded-full p-2 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50 dark:hover:bg-zinc-900 dark:hover:text-zinc-100"
+                className="absolute right-4 top-4 z-10 rounded-full p-2 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50 dark:hover:bg-zinc-900 dark:hover:text-zinc-100 sm:right-6 sm:top-6"
               >
                 <X className="h-5 w-5" />
               </button>
-            </header>
 
             <div className="mx-auto flex w-full max-w-lg min-h-0 flex-1 flex-col px-4 py-6 sm:px-6 sm:py-8">
               {submitted ? (
@@ -195,6 +191,7 @@ export function ImproveGiuseppeDialog({
                   </div>
                 </>
               )}
+            </div>
             </div>
           </motion.div>
         </div>
