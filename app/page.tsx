@@ -55,7 +55,7 @@ export default async function Home() {
           </div>
 
           <p className="text-base leading-relaxed text-zinc-600 dark:text-zinc-400 sm:text-lg">
-            trovo le migliori offerte per prodotti odontoiatrici.
+            confronto prezzi e prodotti per studi dentistici
           </p>
           <div className="mt-5">
             <HomeSearchBox />
@@ -63,7 +63,10 @@ export default async function Home() {
         </section>
 
         {/* Come funziona */}
-        <section className="mt-20 border-t border-zinc-100 pt-16 dark:border-zinc-900">
+        <section
+          id="come-funziona"
+          className="mt-20 scroll-mt-6 border-t border-zinc-100 pt-16 dark:border-zinc-900"
+        >
           <h2 className="mb-10 text-3xl font-black uppercase tracking-tighter sm:text-4xl">
             Come funziona
           </h2>
@@ -88,7 +91,7 @@ export default async function Home() {
         <HomeEcommerceBadges ecommerces={ecommerces} />
 
         {/* Pagamento */}
-        <section className="mt-16 rounded-2xl border border-zinc-100 bg-zinc-50 p-6 dark:border-zinc-800 dark:bg-zinc-900/50">
+        <section className="mt-16">
           <h2 className="mb-4 text-2xl font-black uppercase tracking-tighter sm:text-3xl">
             Quanto costa?
           </h2>

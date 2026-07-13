@@ -1,3 +1,4 @@
+import { Footer } from "@/app/components/layout/Footer";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -30,7 +31,8 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full w-full overflow-x-clip antialiased`}
     >
       <body className="flex min-h-full w-full min-w-0 flex-col overflow-x-clip">
-        {children}
+        <div className="flex min-h-full flex-1 flex-col">{children}</div>
+        <Footer />
         {/* 2. Inserisci il componente qui */}
         <Analytics />
       </body>
