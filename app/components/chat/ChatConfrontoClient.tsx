@@ -152,7 +152,7 @@ function ScenarioProductBadge({
 
           onClick={onNavigateToReferenza}
 
-          className="inline-block w-fit max-w-full rounded-md bg-white px-2 py-1 text-left text-xs font-medium leading-snug break-words text-zinc-700 transition-colors hover:text-zinc-900 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:text-zinc-100"
+          className="inline-block w-fit max-w-full rounded-md bg-white px-2 py-1 text-left text-md font-medium leading-snug break-words text-zinc-700 transition-colors hover:text-zinc-900 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:text-zinc-100"
 
         >
 
