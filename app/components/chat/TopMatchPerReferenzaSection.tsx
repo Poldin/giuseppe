@@ -8,8 +8,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
-  Eye,
-  EyeOff,
   GripVertical,
   Loader2,
   Plus,
@@ -94,19 +92,15 @@ function MatchCardItem({
   card,
   quantity,
   isSelected,
-  isMarkedHidden,
   hideEcommerceBadge = false,
   onQuantityChange,
-  onToggleHidden,
   onToggleSelected,
 }: {
   card: MatchCard;
   quantity: number;
   isSelected: boolean;
-  isMarkedHidden: boolean;
   hideEcommerceBadge?: boolean;
   onQuantityChange: (next: number) => void;
-  onToggleHidden: () => void;
   onToggleSelected: () => void;
 }) {
   const { col, candidato } = card;
@@ -134,11 +128,9 @@ function MatchCardItem({
     }
   };
 
-  const cardClassName = isMarkedHidden
-    ? "border border-dashed border-zinc-300 opacity-60 dark:border-zinc-600"
-    : isSelected
-      ? "border-[3px] border-zinc-900 bg-white shadow-md dark:border-zinc-100 dark:bg-zinc-950"
-      : "border border-zinc-200/40 bg-white/25 dark:border-zinc-700/35 dark:bg-zinc-950/25";
+  const cardClassName = isSelected
+    ? "border-[3px] border-zinc-900 bg-white shadow-md dark:border-zinc-100 dark:bg-zinc-950"
+    : "border border-zinc-200/40 bg-white/25 dark:border-zinc-700/35 dark:bg-zinc-950/25";
 
   const handleCardClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
@@ -169,11 +161,9 @@ function MatchCardItem({
           : `Seleziona ${candidato.product_name}`
       }
       className={`relative flex h-full w-64 shrink-0 flex-col rounded-xl p-4 transition-[opacity,box-shadow,border-color] sm:w-72 ${
-        isMarkedHidden
-          ? ""
-          : isSelected
-            ? "cursor-pointer hover:shadow-sm"
-            : "cursor-pointer opacity-75 hover:opacity-90 hover:shadow-sm"
+        isSelected
+          ? "cursor-pointer hover:shadow-sm"
+          : "cursor-pointer opacity-75 hover:opacity-90 hover:shadow-sm"
       } ${cardClassName}`}
     >
       <div className="absolute right-3 top-3 flex items-center gap-1">
@@ -189,18 +179,6 @@ function MatchCardItem({
           aria-pressed={isSelected}
         >
           <Check className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={onToggleHidden}
-          className="rounded-md p-2 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 sm:p-1.5 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-          aria-label={isMarkedHidden ? "Mostra risultato" : "Nascondi risultato"}
-        >
-          {isMarkedHidden ? (
-            <EyeOff className="h-4 w-4" />
-          ) : (
-            <Eye className="h-4 w-4" />
-          )}
         </button>
       </div>
 
@@ -231,7 +209,7 @@ function MatchCardItem({
             href={productUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-xs font-light text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
           >
             vedi
             <ArrowUpRight className="h-3.5 w-3.5" />
@@ -239,24 +217,15 @@ function MatchCardItem({
         ) : null}
       </div>
 
-      <div className="min-h-12 flex flex-1 items-start gap-1.5 text-sm leading-snug">
-        <span className="min-w-0 flex-1">{candidato.product_name}</span>
-        <button
-          type="button"
-          onClick={handleCopyName}
-          className={`shrink-0 rounded-md p-1 transition-colors ${
-            copied
-              ? "text-emerald-600 dark:text-emerald-400"
-              : "text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-          }`}
-          aria-label={copied ? "Nome copiato" : "Copia nome prodotto"}
-        >
-          {copied ? (
-            <Check className="h-3.5 w-3.5" />
-          ) : (
-            <Copy className="h-3.5 w-3.5" />
-          )}
-        </button>
+      <div className="min-h-12 flex flex-1 flex-col gap-1">
+        <div className="flex items-start gap-1.5 text-sm leading-snug">
+          <span className="min-w-0 flex-1">{candidato.product_name}</span>
+        </div>
+        {candidato.brand ? (
+          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+            {candidato.brand}
+          </p>
+        ) : null}
       </div>
 
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -294,14 +263,12 @@ function EcommerceMatchStrip({
   visibleCards,
   cardState,
   onQuantityChange,
-  onToggleHidden,
   onToggleSelected,
 }: {
   group: EcommerceMatchGroup;
   visibleCards: MatchCard[];
   cardState: CardStateMap;
   onQuantityChange: (key: string, next: number) => void;
-  onToggleHidden: (key: string, hidden: boolean) => void;
   onToggleSelected: (key: string) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -427,19 +394,24 @@ function EcommerceMatchStrip({
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <div className="flex items-center justify-between gap-2 px-1">
-        <div className="inline-flex h-5 max-w-full items-center rounded-md bg-white px-2 py-0.5 ring-1 ring-zinc-100 dark:ring-zinc-800">
-          {group.col.logo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={group.col.logo_url}
-              alt={group.col.ecommerce_name}
-              className="h-full w-auto max-w-28 object-contain object-left"
-            />
-          ) : (
-            <span className="text-xs font-bold uppercase text-zinc-600">
-              {group.col.ecommerce_name}
-            </span>
-          )}
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="inline-flex h-5 max-w-full items-center rounded-md bg-white px-2 py-0.5 ring-1 ring-zinc-100 dark:ring-zinc-800">
+            {group.col.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={group.col.logo_url}
+                alt={group.col.ecommerce_name}
+                className="h-full w-auto max-w-28 object-contain object-left"
+              />
+            ) : (
+              <span className="text-xs font-bold uppercase text-zinc-600">
+                {group.col.ecommerce_name}
+              </span>
+            )}
+          </div>
+          <span className="whitespace-nowrap text-xs text-zinc-500 sm:text-sm dark:text-zinc-400">
+            totale: {group.cards.length}
+          </span>
         </div>
 
         {showScrollControls ? (
@@ -501,10 +473,8 @@ function EcommerceMatchStrip({
                     card={card}
                     quantity={ui.quantity}
                     isSelected={ui.selected}
-                    isMarkedHidden={ui.hidden}
                     hideEcommerceBadge
                     onQuantityChange={(next) => onQuantityChange(card.key, next)}
-                    onToggleHidden={() => onToggleHidden(card.key, ui.hidden)}
                     onToggleSelected={() => onToggleSelected(card.key)}
                   />
                 </div>
@@ -627,7 +597,6 @@ export function TopMatchPerReferenzaSection({
     [confronto.tabelle_ecommerce]
   );
 
-  const [showAllRows, setShowAllRows] = useState<Record<number, boolean>>({});
   const [collapsedRows, setCollapsedRows] = useState<Record<number, boolean>>({});
   const [addingAfterIndex, setAddingAfterIndex] = useState<number | null>(null);
   const [deleteArmedIndex, setDeleteArmedIndex] = useState<number | null>(null);
@@ -782,13 +751,6 @@ export function TopMatchPerReferenzaSection({
     });
   };
 
-  const toggleShowAll = (queryIndex: number) => {
-    setShowAllRows((current) => ({
-      ...current,
-      [queryIndex]: !current[queryIndex],
-    }));
-  };
-
   const scrollToReferenza = useCallback((queryIndex: number) => {
     setCollapsedRows((current) => ({
       ...current,
@@ -836,20 +798,11 @@ export function TopMatchPerReferenzaSection({
 
       <div className="flex flex-col gap-4">
         {rowsWithCards.map(({ row, ecommerceGroups, matchCards }) => {
-          const showAll = Boolean(showAllRows[row.query_index]);
           const isCollapsed = Boolean(collapsedRows[row.query_index]);
           const orderedGroups = orderEcommerceGroups(
             ecommerceGroups,
             ecommerceOrder
           );
-          const visibleGroupCount = orderedGroups.reduce((count, group) => {
-            const visible = group.cards.filter((card) => {
-              const ui = cardState[card.key];
-              if (!ui) return true;
-              return showAll || !ui.hidden;
-            });
-            return count + (visible.length > 0 ? 1 : 0);
-          }, 0);
 
           return (
             <div key={row.query_index} className="flex flex-col gap-3">
@@ -861,13 +814,9 @@ export function TopMatchPerReferenzaSection({
                 <div className={isCollapsed ? "" : "mb-4"}>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                     <div className="flex shrink-0 items-center gap-2 self-end sm:order-2 sm:self-auto">
-                      <button
-                        type="button"
-                        onClick={() => toggleShowAll(row.query_index)}
-                        className="whitespace-nowrap rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-800 shadow-sm transition-colors hover:bg-zinc-50 sm:px-3 sm:text-sm dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
-                      >
-                        {showAll ? "Mostra meno" : "Vedi tutto"} · {matchCards.length}
-                      </button>
+                      <span className="whitespace-nowrap text-xs text-zinc-500 sm:text-sm dark:text-zinc-400">
+                        totale: {matchCards.length}
+                      </span>
 
                       {onRemoveReferenza && canRemoveReferenza ? (
                         <button
@@ -917,48 +866,20 @@ export function TopMatchPerReferenzaSection({
 
                 {!isCollapsed ? (
                   matchCards.length > 0 ? (
-                    visibleGroupCount > 0 ? (
-                      <div className="flex flex-col gap-5">
-                        {orderedGroups.map((group) => {
-                          const visibleCards = group.cards.filter((card) => {
-                            const ui = cardState[card.key];
-                            if (!ui) return true;
-                            return showAll || !ui.hidden;
-                          });
-
-                          if (visibleCards.length === 0) {
-                            return null;
+                    <div className="flex flex-col gap-5">
+                      {orderedGroups.map((group) => (
+                        <EcommerceMatchStrip
+                          key={group.ecommerceId}
+                          group={group}
+                          visibleCards={group.cards}
+                          cardState={cardState}
+                          onQuantityChange={(key, next) =>
+                            updateCardState(key, { quantity: next })
                           }
-
-                          return (
-                            <EcommerceMatchStrip
-                              key={group.ecommerceId}
-                              group={group}
-                              visibleCards={visibleCards}
-                              cardState={cardState}
-                              onQuantityChange={(key, next) =>
-                                updateCardState(key, { quantity: next })
-                              }
-                              onToggleHidden={(key, hidden) =>
-                                updateCardState(key, { hidden: !hidden })
-                              }
-                              onToggleSelected={onToggleSelected}
-                            />
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-zinc-500">
-                        Nessun risultato visibile.{" "}
-                        <button
-                          type="button"
-                          onClick={() => toggleShowAll(row.query_index)}
-                          className="rounded-lg border border-zinc-300 bg-white px-2.5 py-1 text-sm font-semibold text-zinc-800 shadow-sm transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
-                        >
-                          Vedi tutto · {matchCards.length}
-                        </button>
-                      </p>
-                    )
+                          onToggleSelected={onToggleSelected}
+                        />
+                      ))}
+                    </div>
                   ) : (
                     <p className="text-sm text-zinc-500">
                       Nessun match trovato per questa referenza.

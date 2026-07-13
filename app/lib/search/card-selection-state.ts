@@ -325,7 +325,7 @@ export function buildSelezioneFromState(
 
   for (const card of cards) {
     const ui = state[card.key];
-    if (!ui || ui.hidden) continue;
+    if (!ui) continue;
 
     const sel = buildSelezioneUtente({
       cardKey: card.key,
