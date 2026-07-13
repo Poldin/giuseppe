@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 
 import { TopMatchPerReferenzaSection } from "@/app/components/chat/TopMatchPerReferenzaSection";
+import { ConfrontoEcommerceTable } from "@/app/components/chat/ConfrontoEcommerceTable";
 import { QuantityControl } from "@/app/components/chat/QuantityControl";
 
 import {
@@ -586,7 +587,7 @@ function EcommerceRankingCard({
 
         <h3 className="text-base font-bold sm:text-lg">
 
-          Classifica e-commerce
+          Classifica fornitori
 
         </h3>
 
@@ -757,291 +758,6 @@ function EcommerceRankingCard({
       )}
 
     </div>
-
-  );
-
-}
-
-
-
-function EcommerceTablesSection({
-
-  tabelle,
-
-  onNavigateToReferenza,
-
-}: {
-
-  tabelle: TabellaEcommerce[];
-
-  onNavigateToReferenza?: (queryIndex: number) => void;
-
-}) {
-
-  return (
-
-    <section
-
-      id="confronto-ecommerce"
-
-      tabIndex={-1}
-
-      className="scroll-mt-24 flex min-w-0 flex-col gap-6 outline-none"
-
-    >
-
-      <div>
-
-        <h2 className="text-xl font-black uppercase tracking-tighter">
-
-          Confronto per e-commerce
-
-        </h2>
-
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-
-        scopri chi offre di più.
-
-        </p>
-
-      </div>
-
-
-
-      {tabelle.length === 0 ? (
-
-        <p className="rounded-2xl border border-dashed border-zinc-300 p-8 text-center text-sm text-zinc-500 dark:border-zinc-700">
-
-          Nessuna selezione attiva. Seleziona almeno un prodotto per referenza.
-
-        </p>
-
-      ) : null}
-
-
-
-      {tabelle.map((tabella, index) => (
-
-        <article
-
-          key={tabella.ecommerce_id}
-
-          id={`ecommerce-tabella-${tabella.ecommerce_id}`}
-
-          tabIndex={-1}
-
-          className="scroll-mt-24 overflow-hidden rounded-2xl border border-zinc-200 outline-none dark:border-zinc-800"
-
-        >
-
-          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 bg-zinc-50 px-4 py-3 sm:px-5 sm:py-4 dark:border-zinc-800 dark:bg-zinc-900/70">
-
-            <div className="flex items-center gap-3">
-
-              {index === 0 ? (
-
-
-                <span className="shrink-0 text-base leading-none" aria-hidden="true">
-                  🥇
-                </span>
-
-
-
-              ) : null}
-
-              <div className="inline-flex h-6 max-w-full items-center rounded-md bg-white px-2 py-0.5 ring-1 ring-zinc-100 dark:ring-zinc-800">
-
-                {tabella.logo_url ? (
-
-                  // eslint-disable-next-line @next/next/no-img-element
-
-                  <img
-
-                    src={tabella.logo_url}
-
-                    alt={tabella.ecommerce_name}
-
-                    className="h-full w-auto max-w-28 object-contain object-left"
-
-                  />
-
-                ) : (
-
-                  <span className="text-xs font-bold uppercase text-zinc-600 dark:text-zinc-400">
-
-                    {tabella.ecommerce_name.slice(0, 2)}
-
-                  </span>
-
-                )}
-
-              </div>
-
-            </div>
-
-            <div className="text-right">
-
-              <p className="text-lg font-bold">
-
-                {formatPrice(tabella.prezzo_totale)}
-
-              </p>
-
-              <p className="text-xs text-zinc-500">
-
-                {tabella.copertura}/{tabella.copertura_totale} · prodotti{" "}
-
-                {formatPrice(tabella.prezzo_prodotti)} · sped.{" "}
-
-                {formatPrice(tabella.prezzo_spedizione)}
-
-              </p>
-
-            </div>
-
-          </header>
-
-
-
-          <div className="overflow-x-auto">
-
-            <table className="min-w-full text-sm [&_td]:whitespace-normal [&_th]:whitespace-normal">
-
-              <thead>
-
-                <tr className="border-b border-zinc-100 dark:border-zinc-900">
-
-                  <th className="px-3 py-2 text-left font-semibold sm:px-5 sm:py-3">Richiesto</th>
-
-                  <th className="px-3 py-2 text-left font-semibold sm:px-5 sm:py-3">Selezionato</th>
-
-                  <th className="px-3 py-2 text-right font-semibold sm:px-5 sm:py-3">Totale</th>
-
-                </tr>
-
-              </thead>
-
-              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-900">
-
-                {tabella.righe.map((riga) => (
-
-                  <tr
-
-                    key={`${tabella.ecommerce_id}-${riga.query_index}`}
-
-                    className={
-
-                      riga.trovato && riga.disponibile !== false
-
-                        ? undefined
-
-                        : "bg-amber-50/50 dark:bg-amber-950/20"
-
-                    }
-
-                  >
-
-                    <td className="px-3 py-2 align-top font-medium break-words sm:px-5 sm:py-3">
-
-                      {onNavigateToReferenza ? (
-
-                        <button
-
-                          type="button"
-
-                          onClick={() => onNavigateToReferenza(riga.query_index)}
-
-                          className="text-left break-words transition-colors hover:text-zinc-600 dark:hover:text-zinc-300"
-
-                        >
-
-                          {riga.query_text}
-
-                        </button>
-
-                      ) : (
-
-                        riga.query_text
-
-                      )}
-
-                    </td>
-
-                    <td className="px-3 py-2 align-top break-words sm:px-5 sm:py-3">
-
-                      {riga.trovato && riga.offerta ? (
-
-                        riga.offerta.product_name
-
-                      ) : (
-
-                        <span className="text-amber-700 dark:text-amber-400">
-
-                          Non selezionato
-
-                        </span>
-
-                      )}
-
-                    </td>
-
-                    <td className="px-3 py-2 align-top text-right sm:px-5 sm:py-3">
-
-                      {riga.prezzo_riga != null && riga.offerta ? (
-
-                        riga.quantita != null && riga.quantita > 1 ? (
-
-                          <div className="inline-flex items-center justify-end gap-2">
-
-                            <span className="inline-flex min-w-6 items-center justify-center rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-
-                              {riga.quantita}
-
-                            </span>
-
-                            <span className="text-sm tabular-nums text-zinc-600 dark:text-zinc-400">
-
-                              × {formatPrice(riga.offerta.prezzo)} ={" "}
-
-                              <span className="font-semibold text-zinc-900 dark:text-zinc-100">
-
-                                {formatPrice(riga.prezzo_riga)}
-
-                              </span>
-
-                            </span>
-
-                          </div>
-
-                        ) : (
-
-                          formatPrice(riga.prezzo_riga)
-
-                        )
-
-                      ) : (
-
-                        "—"
-
-                      )}
-
-                    </td>
-
-                  </tr>
-
-                ))}
-
-              </tbody>
-
-            </table>
-
-          </div>
-
-        </article>
-
-      ))}
-
-    </section>
 
   );
 
@@ -1403,7 +1119,7 @@ export function ChatConfrontoClient({
 
       const element = document.getElementById(
 
-        `ecommerce-tabella-${ecommerceId}`
+        `ecommerce-col-${ecommerceId}`
 
       );
 
@@ -1413,7 +1129,7 @@ export function ChatConfrontoClient({
 
       }
 
-      element.scrollIntoView({ behavior: "smooth", block: "start" });
+      element.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
 
       element.focus({ preventScroll: true });
 
@@ -1639,7 +1355,7 @@ export function ChatConfrontoClient({
 
       />
 
-      <EcommerceTablesSection
+      <ConfrontoEcommerceTable
 
         tabelle={calcolo.tabelle_ecommerce}
 
