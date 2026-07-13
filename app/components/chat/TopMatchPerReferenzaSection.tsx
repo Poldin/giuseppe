@@ -137,7 +137,7 @@ function MatchCardItem({
     ? "border border-dashed border-zinc-300 opacity-60 dark:border-zinc-600"
     : isSelected
       ? "border-[3px] border-zinc-900 bg-white shadow-md dark:border-zinc-100 dark:bg-zinc-950"
-      : "border border-zinc-200/60 bg-white/80 opacity-70 dark:border-zinc-700/50 dark:bg-zinc-950/40";
+      : "border border-zinc-200/40 bg-white/25 dark:border-zinc-700/35 dark:bg-zinc-950/25";
 
   const handleCardClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
@@ -168,7 +168,11 @@ function MatchCardItem({
           : `Seleziona ${candidato.product_name}`
       }
       className={`relative flex h-full w-64 shrink-0 flex-col rounded-xl p-4 transition-[opacity,box-shadow,border-color] sm:w-72 ${
-        isMarkedHidden ? "" : "cursor-pointer hover:shadow-sm"
+        isMarkedHidden
+          ? ""
+          : isSelected
+            ? "cursor-pointer hover:shadow-sm"
+            : "cursor-pointer opacity-75 hover:opacity-90 hover:shadow-sm"
       } ${cardClassName}`}
     >
       <div className="absolute right-3 top-3 flex items-center gap-1">
@@ -332,13 +336,27 @@ function EcommerceMatchStrip({
     };
   }, [updateScrollState, visibleCards.length]);
 
+  const getScrollStep = (element: HTMLDivElement) => {
+    const track = element.firstElementChild;
+    const firstCard = track?.firstElementChild as HTMLElement | null;
+    const secondCard = track?.children[1] as HTMLElement | null;
+
+    if (firstCard && secondCard) {
+      return secondCard.offsetLeft - firstCard.offsetLeft;
+    }
+    if (firstCard) {
+      return firstCard.offsetWidth + 12;
+    }
+    return 288;
+  };
+
   const scrollStrip = (direction: "left" | "right") => {
     const element = scrollRef.current;
     if (!element) {
       return;
     }
 
-    const amount = Math.max(288, element.clientWidth * 0.75);
+    const amount = getScrollStep(element);
     element.scrollBy({
       left: direction === "left" ? -amount : amount,
       behavior: "smooth",
@@ -760,7 +778,7 @@ export function TopMatchPerReferenzaSection({
               <article
                 id={`referenza-${row.query_index}`}
                 tabIndex={-1}
-                className="min-w-0 scroll-mt-24 rounded-2xl border border-zinc-100 bg-zinc-100/70 p-4 outline-none dark:border-zinc-900 dark:bg-zinc-900/50 sm:p-5"
+                className="min-w-0 scroll-mt-24 rounded-2xl border border-zinc-200/80 bg-zinc-200 p-4 outline-none dark:border-zinc-900 dark:bg-zinc-900/50 sm:p-5"
               >
                 <div className={isCollapsed ? "" : "mb-4"}>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
