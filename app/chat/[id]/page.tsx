@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChatConfrontoClient } from "@/app/components/chat/ChatConfrontoClient";
+import { ChatSponsoredBanner } from "@/app/components/chat/ChatSponsoredBanner";
 import { ShareResultsButton } from "@/app/components/chat/ShareResultsButton";
 import { HowItWorksButton } from "@/app/components/onboarding/HowItWorksButton";
 import { getProductSearchChat } from "@/app/lib/search/chat-store";
@@ -120,6 +121,7 @@ export default async function ChatPage({ params }: ChatPageProps) {
           <LegacyResultsTable results={legacyResults} />
         )}
       </main>
+      <ChatSponsoredBanner />
     </div>
   );
 }
