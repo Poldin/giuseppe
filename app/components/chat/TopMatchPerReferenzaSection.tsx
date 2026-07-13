@@ -96,6 +96,7 @@ function MatchCardItem({
   onQuantityChange,
   onToggleSelected,
   onAddAsReferenza,
+  isAddingReferenza = false,
 }: {
   card: MatchCard;
   quantity: number;
@@ -104,6 +105,7 @@ function MatchCardItem({
   onQuantityChange: (next: number) => void;
   onToggleSelected: () => void;
   onAddAsReferenza?: (productName: string) => void;
+  isAddingReferenza?: boolean;
 }) {
   const { col, candidato } = card;
   const [copied, setCopied] = useState(false);
@@ -219,9 +221,14 @@ function MatchCardItem({
           <button
             type="button"
             onClick={() => onAddAsReferenza(candidato.product_name)}
-            className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-xs font-light text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            disabled={isAddingReferenza}
+            className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-xs font-light text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
           >
-            <Plus className="h-3.5 w-3.5" />
+            {isAddingReferenza ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Plus className="h-3.5 w-3.5" />
+            )}
             aggiungi 🔎
           </button>
         ) : null}
@@ -275,6 +282,7 @@ function EcommerceMatchStrip({
   onQuantityChange,
   onToggleSelected,
   onAddAsReferenza,
+  isAddingReferenza = false,
 }: {
   group: EcommerceMatchGroup;
   visibleCards: MatchCard[];
@@ -282,6 +290,7 @@ function EcommerceMatchStrip({
   onQuantityChange: (key: string, next: number) => void;
   onToggleSelected: (key: string) => void;
   onAddAsReferenza?: (productName: string) => void;
+  isAddingReferenza?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -489,6 +498,7 @@ function EcommerceMatchStrip({
                     onQuantityChange={(next) => onQuantityChange(card.key, next)}
                     onToggleSelected={() => onToggleSelected(card.key)}
                     onAddAsReferenza={onAddAsReferenza}
+                    isAddingReferenza={isAddingReferenza}
                   />
                 </div>
               </Fragment>
@@ -501,21 +511,18 @@ function EcommerceMatchStrip({
 }
 
 function AddReferenzaInlineRow({
-  initialProductName = "",
   onConfirm,
   onCancel,
   isSubmitting,
   error,
 }: {
-  initialProductName?: string;
   onConfirm: (productName: string) => void;
   onCancel: () => void;
   isSubmitting: boolean;
   error: string | null;
 }) {
-  const trimmedInitial = initialProductName.trim();
-  const [query, setQuery] = useState(trimmedInitial);
-  const [selectedName, setSelectedName] = useState(trimmedInitial);
+  const [query, setQuery] = useState("");
+  const [selectedName, setSelectedName] = useState("");
 
   const handleSelect = (productName: string) => {
     const trimmed = productName.trim();
@@ -615,7 +622,6 @@ export function TopMatchPerReferenzaSection({
 
   const [collapsedRows, setCollapsedRows] = useState<Record<number, boolean>>({});
   const [addingAfterIndex, setAddingAfterIndex] = useState<number | null>(null);
-  const [initialAddProductName, setInitialAddProductName] = useState("");
   const [deleteArmedIndex, setDeleteArmedIndex] = useState<number | null>(null);
   const prevAddingReferenza = useRef(isAddingReferenza);
   const prevRemovingReferenza = useRef(isRemovingReferenza);
@@ -629,7 +635,6 @@ export function TopMatchPerReferenzaSection({
       !addReferenzaError
     ) {
       setAddingAfterIndex(null);
-      setInitialAddProductName("");
     }
     prevAddingReferenza.current = isAddingReferenza;
   }, [isAddingReferenza, addReferenzaError]);
@@ -898,12 +903,12 @@ export function TopMatchPerReferenzaSection({
                           onAddAsReferenza={
                             onAddReferenza
                               ? (productName) => {
-                                  setAddingAfterIndex(row.query_index);
-                                  setInitialAddProductName(productName);
+                                  onAddReferenza(row.query_index, productName);
                                   setDeleteArmedIndex(null);
                                 }
                               : undefined
                           }
+                          isAddingReferenza={isAddingReferenza}
                         />
                       ))}
                     </div>
@@ -918,18 +923,10 @@ export function TopMatchPerReferenzaSection({
               {onAddReferenza ? (
                 addingAfterIndex === row.query_index ? (
                   <AddReferenzaInlineRow
-                    initialProductName={
-                      addingAfterIndex === row.query_index
-                        ? initialAddProductName
-                        : ""
-                    }
                     onConfirm={(productName) => {
                       onAddReferenza(row.query_index, productName);
                     }}
-                    onCancel={() => {
-                      setAddingAfterIndex(null);
-                      setInitialAddProductName("");
-                    }}
+                    onCancel={() => setAddingAfterIndex(null)}
                     isSubmitting={isAddingReferenza}
                     error={addReferenzaError}
                   />
@@ -939,7 +936,6 @@ export function TopMatchPerReferenzaSection({
                       type="button"
                       onClick={() => {
                         setAddingAfterIndex(row.query_index);
-                        setInitialAddProductName("");
                         setDeleteArmedIndex(null);
                       }}
                       disabled={isAddingReferenza || addingAfterIndex !== null}

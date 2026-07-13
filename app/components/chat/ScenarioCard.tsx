@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowUpRight } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowUpRight, Loader2, Trash2 } from "lucide-react";
 
 import { QuantityControl } from "@/app/components/chat/QuantityControl";
 import {
@@ -50,6 +51,9 @@ function ScenarioProductBadge({
   quantita,
   onNavigateToReferenza,
   onQuantityChange,
+  onRemoveClick,
+  isRemoveArmed = false,
+  isRemoving = false,
 }: {
   productName: string;
   brand?: string | null;
@@ -57,22 +61,51 @@ function ScenarioProductBadge({
   quantita: number;
   onNavigateToReferenza?: () => void;
   onQuantityChange?: (next: number) => void;
+  onRemoveClick?: () => void;
+  isRemoveArmed?: boolean;
+  isRemoving?: boolean;
 }) {
   return (
     <div className="min-w-0 space-y-1.5">
-      {onNavigateToReferenza ? (
-        <button
-          type="button"
-          onClick={onNavigateToReferenza}
-          className="inline-block w-fit max-w-full rounded-md bg-white px-2 py-1 text-left text-md font-medium leading-snug break-words text-zinc-700 transition-colors hover:text-zinc-900 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:text-zinc-100"
-        >
-          {productName}
-        </button>
-      ) : (
-        <span className="inline-block w-fit max-w-full rounded-md bg-white px-2 py-1 text-xs font-medium leading-snug break-words text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
-          {productName}
-        </span>
-      )}
+      <div className="flex min-w-0 items-start gap-1.5">
+        {onRemoveClick ? (
+          <button
+            type="button"
+            onClick={onRemoveClick}
+            disabled={isRemoving}
+            aria-label={
+              isRemoveArmed
+                ? "Conferma eliminazione referenza"
+                : "Elimina referenza"
+            }
+            className={`mt-0.5 shrink-0 rounded-md p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+              isRemoveArmed
+                ? "bg-red-600 text-white hover:bg-red-700"
+                : "font-light text-zinc-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400"
+            }`}
+          >
+            {isRemoving ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+            )}
+          </button>
+        ) : null}
+
+        {onNavigateToReferenza ? (
+          <button
+            type="button"
+            onClick={onNavigateToReferenza}
+            className="inline-block w-fit max-w-full rounded-md bg-white px-2 py-1 text-left text-md font-bold leading-snug break-words text-zinc-700 transition-colors hover:text-zinc-900 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:text-zinc-100"
+          >
+            {productName}
+          </button>
+        ) : (
+          <span className="inline-block w-fit max-w-full rounded-md bg-white px-2 py-1 text-xs font-bold leading-snug break-words text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+            {productName}
+          </span>
+        )}
+      </div>
       <div className="flex flex-wrap items-center gap-1.5">
         {brand ? (
           <span className="inline-flex shrink-0 items-center px-2 py-0.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">
@@ -124,6 +157,9 @@ export function ScenarioCard({
   queryIndexByOffertaId,
   onNavigateToReferenza,
   onQuantityChange,
+  onRemoveReferenza,
+  isRemovingReferenza = false,
+  canRemoveReferenza = false,
 }: {
   scenario: ScenarioCarrello;
   catalogById: Record<string, TabellaEcommerce>;
@@ -136,7 +172,33 @@ export function ScenarioCard({
     offertaId: string;
     next: number;
   }) => void;
+  onRemoveReferenza?: (queryIndex: number) => void;
+  isRemovingReferenza?: boolean;
+  canRemoveReferenza?: boolean;
 }) {
+  const [deleteArmedIndex, setDeleteArmedIndex] = useState<number | null>(null);
+  const prevRemovingReferenza = useRef(isRemovingReferenza);
+
+  useEffect(() => {
+    if (prevRemovingReferenza.current && !isRemovingReferenza) {
+      setDeleteArmedIndex(null);
+    }
+    prevRemovingReferenza.current = isRemovingReferenza;
+  }, [isRemovingReferenza]);
+
+  const handleTrashClick = (queryIndex: number) => {
+    if (!onRemoveReferenza || !canRemoveReferenza || isRemovingReferenza) {
+      return;
+    }
+
+    if (deleteArmedIndex === queryIndex) {
+      onRemoveReferenza(queryIndex);
+      return;
+    }
+
+    setDeleteArmedIndex(queryIndex);
+  };
+
   return (
     <div className="overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800">
       <header className="flex flex-wrap items-start justify-between gap-3 bg-zinc-900 px-4 py-3 sm:px-5 sm:py-4 dark:bg-zinc-950">
@@ -176,7 +238,7 @@ export function ScenarioCard({
           return (
             <div key={ecomId} className="mb-4 last:mb-0">
               <div className="mb-1 flex items-start justify-between gap-3">
-                <div className="inline-flex h-5 max-w-full items-center rounded-md bg-white px-2 py-0.5 ring-1 ring-zinc-100 dark:ring-zinc-800">
+                <div className="inline-flex h-6 max-w-full items-center rounded-md bg-white px-2 py-0.5 ring-1 ring-zinc-100 dark:ring-zinc-800">
                   {ecom?.logo_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -216,10 +278,13 @@ export function ScenarioCard({
                 </div>
               ) : null}
               <ul className="space-y-2">
-                {voci.map((voce) => (
+                {voci.map((voce) => {
+                  const queryIndex = queryIndexByOffertaId.get(voce.offerta.id);
+
+                  return (
                   <li
                     key={voce.offerta.id}
-                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4"
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 sm:items-center sm:gap-x-4"
                   >
                     <ScenarioProductBadge
                       productName={voce.offerta.product_name}
@@ -227,26 +292,13 @@ export function ScenarioCard({
                       url={voce.offerta.original_url?.trim() || null}
                       quantita={voce.quantita}
                       onNavigateToReferenza={
-                        onNavigateToReferenza
-                          ? () => {
-                              const queryIndex = queryIndexByOffertaId.get(
-                                voce.offerta.id
-                              );
-                              if (queryIndex != null) {
-                                onNavigateToReferenza(queryIndex);
-                              }
-                            }
+                        onNavigateToReferenza && queryIndex != null
+                          ? () => onNavigateToReferenza(queryIndex)
                           : undefined
                       }
                       onQuantityChange={
-                        onQuantityChange
+                        onQuantityChange && queryIndex != null
                           ? (next) => {
-                              const queryIndex = queryIndexByOffertaId.get(
-                                voce.offerta.id
-                              );
-                              if (queryIndex == null) {
-                                return;
-                              }
                               onQuantityChange({
                                 queryIndex,
                                 ecommerceId: ecomId,
@@ -256,8 +308,19 @@ export function ScenarioCard({
                             }
                           : undefined
                       }
+                      onRemoveClick={
+                        onRemoveReferenza &&
+                        canRemoveReferenza &&
+                        queryIndex != null
+                          ? () => handleTrashClick(queryIndex)
+                          : undefined
+                      }
+                      isRemoveArmed={deleteArmedIndex === queryIndex}
+                      isRemoving={
+                        isRemovingReferenza && deleteArmedIndex === queryIndex
+                      }
                     />
-                    <div className="shrink-0 text-right text-sm tabular-nums text-zinc-600 dark:text-zinc-400">
+                    <div className="shrink-0 self-center text-right text-sm tabular-nums text-zinc-600 dark:text-zinc-400">
                       {voce.quantita > 1 ? (
                         <span className="whitespace-nowrap">
                           × {formatPrice(voce.offerta.prezzo)} ={" "}
@@ -275,7 +338,8 @@ export function ScenarioCard({
                       )}
                     </div>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             </div>
           );

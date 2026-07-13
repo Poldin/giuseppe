@@ -339,6 +339,11 @@ export function ChatConfrontoClient({
             queryIndexByOffertaId={queryIndexByOffertaId}
             onNavigateToReferenza={scrollToReferenza}
             onQuantityChange={handleScenarioQuantityChange}
+            onRemoveReferenza={(queryIndex) => {
+              void handleRemoveReferenza(queryIndex);
+            }}
+            isRemovingReferenza={isRemovingReferenza}
+            canRemoveReferenza={confronto.prodotti_richiesti.length > 1}
           />
         </div>
 
