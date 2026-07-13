@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, Loader2, Trash2 } from "lucide-react";
+import { ArrowUpRight, Loader2, Plus, Trash2 } from "lucide-react";
+
+import { AddReferenzaInlineRow } from "@/app/components/chat/TopMatchPerReferenzaSection";
 
 import { QuantityControl } from "@/app/components/chat/QuantityControl";
 import {
@@ -160,6 +162,10 @@ export function ScenarioCard({
   onRemoveReferenza,
   isRemovingReferenza = false,
   canRemoveReferenza = false,
+  onAddReferenza,
+  isAddingReferenza = false,
+  addReferenzaError = null,
+  addReferenzaAfterIndex,
 }: {
   scenario: ScenarioCarrello;
   catalogById: Record<string, TabellaEcommerce>;
@@ -175,9 +181,15 @@ export function ScenarioCard({
   onRemoveReferenza?: (queryIndex: number) => void;
   isRemovingReferenza?: boolean;
   canRemoveReferenza?: boolean;
+  onAddReferenza?: (insertAfterIndex: number, productName: string) => void;
+  isAddingReferenza?: boolean;
+  addReferenzaError?: string | null;
+  addReferenzaAfterIndex?: number;
 }) {
   const [deleteArmedIndex, setDeleteArmedIndex] = useState<number | null>(null);
+  const [isAddingOpen, setIsAddingOpen] = useState(false);
   const prevRemovingReferenza = useRef(isRemovingReferenza);
+  const prevAddingReferenza = useRef(isAddingReferenza);
 
   useEffect(() => {
     if (prevRemovingReferenza.current && !isRemovingReferenza) {
@@ -185,6 +197,13 @@ export function ScenarioCard({
     }
     prevRemovingReferenza.current = isRemovingReferenza;
   }, [isRemovingReferenza]);
+
+  useEffect(() => {
+    if (prevAddingReferenza.current && !isAddingReferenza && !addReferenzaError) {
+      setIsAddingOpen(false);
+    }
+    prevAddingReferenza.current = isAddingReferenza;
+  }, [isAddingReferenza, addReferenzaError]);
 
   const handleTrashClick = (queryIndex: number) => {
     if (!onRemoveReferenza || !canRemoveReferenza || isRemovingReferenza) {
@@ -344,6 +363,33 @@ export function ScenarioCard({
             </div>
           );
         })}
+        {onAddReferenza && addReferenzaAfterIndex != null ? (
+          isAddingOpen ? (
+            <AddReferenzaInlineRow
+              onConfirm={(productName) => {
+                onAddReferenza(addReferenzaAfterIndex, productName);
+              }}
+              onCancel={() => setIsAddingOpen(false)}
+              isSubmitting={isAddingReferenza}
+              error={addReferenzaError}
+            />
+          ) : (
+            <div className="mt-4 flex justify-start">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddingOpen(true);
+                  setDeleteArmedIndex(null);
+                }}
+                disabled={isAddingReferenza}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:bg-zinc-800"
+              >
+                <Plus className="h-4 w-4" />
+                aggiungi prodotto 🔎
+              </button>
+            </div>
+          )
+        ) : null}
       </div>
     </div>
   );

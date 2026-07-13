@@ -510,7 +510,7 @@ function EcommerceMatchStrip({
   );
 }
 
-function AddReferenzaInlineRow({
+export function AddReferenzaInlineRow({
   onConfirm,
   onCancel,
   isSubmitting,

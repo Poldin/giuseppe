@@ -344,6 +344,12 @@ export function ChatConfrontoClient({
             }}
             isRemovingReferenza={isRemovingReferenza}
             canRemoveReferenza={confronto.prodotti_richiesti.length > 1}
+            onAddReferenza={(insertAfterIndex, productName) => {
+              void handleAddReferenza(insertAfterIndex, productName);
+            }}
+            isAddingReferenza={isAddingReferenza}
+            addReferenzaError={addReferenzaError}
+            addReferenzaAfterIndex={confronto.prodotti_richiesti.length - 1}
           />
         </div>
 
