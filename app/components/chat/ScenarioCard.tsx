@@ -288,7 +288,7 @@ export function ScenarioCard({
                   {shippingHints.map((hint) => (
                     <span
                       key={`${hint.targetShipping}-${hint.gap}`}
-                      className="inline-flex max-w-full rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium leading-snug text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200"
+                      className="inline-flex max-w-full rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-light leading-snug text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200"
                     >
                       ancora {formatPrice(hint.gap)} per{" "}
                       {formatPrice(hint.targetShipping)} di spedizione
