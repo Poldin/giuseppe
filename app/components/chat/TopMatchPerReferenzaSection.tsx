@@ -95,6 +95,7 @@ function MatchCardItem({
   hideEcommerceBadge = false,
   onQuantityChange,
   onToggleSelected,
+  onAddAsReferenza,
 }: {
   card: MatchCard;
   quantity: number;
@@ -102,6 +103,7 @@ function MatchCardItem({
   hideEcommerceBadge?: boolean;
   onQuantityChange: (next: number) => void;
   onToggleSelected: () => void;
+  onAddAsReferenza?: (productName: string) => void;
 }) {
   const { col, candidato } = card;
   const [copied, setCopied] = useState(false);
@@ -183,9 +185,6 @@ function MatchCardItem({
       </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-2 pr-8">
-        <span className="text-xs font-bold tabular-nums text-zinc-500">
-          {Math.round(candidato.similarity * 100)}%
-        </span>
 
         {!hideEcommerceBadge ? (
           <div className="inline-flex h-5 max-w-full items-center rounded-md bg-white px-2 py-0.5 ring-1 ring-zinc-100 dark:ring-zinc-800">
@@ -214,6 +213,17 @@ function MatchCardItem({
             vedi
             <ArrowUpRight className="h-3.5 w-3.5" />
           </a>
+        ) : null}
+
+        {onAddAsReferenza ? (
+          <button
+            type="button"
+            onClick={() => onAddAsReferenza(candidato.product_name)}
+            className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-xs font-light text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            aggiungi 🔎
+          </button>
         ) : null}
       </div>
 
@@ -264,12 +274,14 @@ function EcommerceMatchStrip({
   cardState,
   onQuantityChange,
   onToggleSelected,
+  onAddAsReferenza,
 }: {
   group: EcommerceMatchGroup;
   visibleCards: MatchCard[];
   cardState: CardStateMap;
   onQuantityChange: (key: string, next: number) => void;
   onToggleSelected: (key: string) => void;
+  onAddAsReferenza?: (productName: string) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -476,6 +488,7 @@ function EcommerceMatchStrip({
                     hideEcommerceBadge
                     onQuantityChange={(next) => onQuantityChange(card.key, next)}
                     onToggleSelected={() => onToggleSelected(card.key)}
+                    onAddAsReferenza={onAddAsReferenza}
                   />
                 </div>
               </Fragment>
@@ -488,18 +501,21 @@ function EcommerceMatchStrip({
 }
 
 function AddReferenzaInlineRow({
+  initialProductName = "",
   onConfirm,
   onCancel,
   isSubmitting,
   error,
 }: {
+  initialProductName?: string;
   onConfirm: (productName: string) => void;
   onCancel: () => void;
   isSubmitting: boolean;
   error: string | null;
 }) {
-  const [query, setQuery] = useState("");
-  const [selectedName, setSelectedName] = useState("");
+  const trimmedInitial = initialProductName.trim();
+  const [query, setQuery] = useState(trimmedInitial);
+  const [selectedName, setSelectedName] = useState(trimmedInitial);
 
   const handleSelect = (productName: string) => {
     const trimmed = productName.trim();
@@ -599,6 +615,7 @@ export function TopMatchPerReferenzaSection({
 
   const [collapsedRows, setCollapsedRows] = useState<Record<number, boolean>>({});
   const [addingAfterIndex, setAddingAfterIndex] = useState<number | null>(null);
+  const [initialAddProductName, setInitialAddProductName] = useState("");
   const [deleteArmedIndex, setDeleteArmedIndex] = useState<number | null>(null);
   const prevAddingReferenza = useRef(isAddingReferenza);
   const prevRemovingReferenza = useRef(isRemovingReferenza);
@@ -612,6 +629,7 @@ export function TopMatchPerReferenzaSection({
       !addReferenzaError
     ) {
       setAddingAfterIndex(null);
+      setInitialAddProductName("");
     }
     prevAddingReferenza.current = isAddingReferenza;
   }, [isAddingReferenza, addReferenzaError]);
@@ -877,6 +895,15 @@ export function TopMatchPerReferenzaSection({
                             updateCardState(key, { quantity: next })
                           }
                           onToggleSelected={onToggleSelected}
+                          onAddAsReferenza={
+                            onAddReferenza
+                              ? (productName) => {
+                                  setAddingAfterIndex(row.query_index);
+                                  setInitialAddProductName(productName);
+                                  setDeleteArmedIndex(null);
+                                }
+                              : undefined
+                          }
                         />
                       ))}
                     </div>
@@ -891,10 +918,18 @@ export function TopMatchPerReferenzaSection({
               {onAddReferenza ? (
                 addingAfterIndex === row.query_index ? (
                   <AddReferenzaInlineRow
+                    initialProductName={
+                      addingAfterIndex === row.query_index
+                        ? initialAddProductName
+                        : ""
+                    }
                     onConfirm={(productName) => {
                       onAddReferenza(row.query_index, productName);
                     }}
-                    onCancel={() => setAddingAfterIndex(null)}
+                    onCancel={() => {
+                      setAddingAfterIndex(null);
+                      setInitialAddProductName("");
+                    }}
                     isSubmitting={isAddingReferenza}
                     error={addReferenzaError}
                   />
@@ -904,13 +939,14 @@ export function TopMatchPerReferenzaSection({
                       type="button"
                       onClick={() => {
                         setAddingAfterIndex(row.query_index);
+                        setInitialAddProductName("");
                         setDeleteArmedIndex(null);
                       }}
                       disabled={isAddingReferenza || addingAfterIndex !== null}
                       className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:bg-zinc-800"
                     >
                       <Plus className="h-4 w-4" />
-                      aggiungi
+                      aggiungi prodotto 🔎
                     </button>
                   </div>
                 )
