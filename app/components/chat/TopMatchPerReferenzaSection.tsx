@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUpRight,
   Check,
@@ -10,6 +10,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  GripVertical,
   Loader2,
   Plus,
   Trash2,
@@ -306,6 +307,12 @@ function EcommerceMatchStrip({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStateRef = useRef({
+    active: false,
+    startX: 0,
+    startScrollLeft: 0,
+  });
 
   const updateScrollState = useCallback(() => {
     const element = scrollRef.current;
@@ -338,14 +345,16 @@ function EcommerceMatchStrip({
 
   const getScrollStep = (element: HTMLDivElement) => {
     const track = element.firstElementChild;
-    const firstCard = track?.firstElementChild as HTMLElement | null;
-    const secondCard = track?.children[1] as HTMLElement | null;
-
-    if (firstCard && secondCard) {
-      return secondCard.offsetLeft - firstCard.offsetLeft;
+    if (!track) {
+      return 288;
     }
-    if (firstCard) {
-      return firstCard.offsetWidth + 12;
+
+    const cards = track.querySelectorAll<HTMLElement>("[data-strip-card]");
+    if (cards.length >= 2) {
+      return cards[1].offsetLeft - cards[0].offsetLeft;
+    }
+    if (cards.length === 1) {
+      return cards[0].offsetWidth + 12;
     }
     return 288;
   };
@@ -361,6 +370,56 @@ function EcommerceMatchStrip({
       left: direction === "left" ? -amount : amount,
       behavior: "smooth",
     });
+  };
+
+  const handleDragPointerDown = (
+    event: React.PointerEvent<HTMLDivElement>
+  ) => {
+    if (event.pointerType !== "mouse" || event.button !== 0) {
+      return;
+    }
+
+    const element = scrollRef.current;
+    if (!element) {
+      return;
+    }
+
+    dragStateRef.current = {
+      active: true,
+      startX: event.clientX,
+      startScrollLeft: element.scrollLeft,
+    };
+    setIsDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleDragPointerMove = (
+    event: React.PointerEvent<HTMLDivElement>
+  ) => {
+    if (!dragStateRef.current.active) {
+      return;
+    }
+
+    const element = scrollRef.current;
+    if (!element) {
+      return;
+    }
+
+    const deltaX = event.clientX - dragStateRef.current.startX;
+    element.scrollLeft = dragStateRef.current.startScrollLeft - deltaX;
+  };
+
+  const handleDragPointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragStateRef.current.active) {
+      return;
+    }
+
+    dragStateRef.current.active = false;
+    setIsDragging(false);
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
   };
 
   const showScrollControls = canScrollLeft || canScrollRight;
@@ -409,10 +468,10 @@ function EcommerceMatchStrip({
 
       <div
         ref={scrollRef}
-        className="-mx-4 min-w-0 overflow-x-auto px-4 pb-1 scrollbar-none sm:-mx-1 sm:px-1"
+        className="-mx-4 min-w-0 overflow-x-auto px-4 pb-1 scrollbar-none touch-pan-x sm:-mx-1 sm:px-1"
       >
-        <div className="flex w-max gap-3">
-          {visibleCards.map((card) => {
+        <div className="flex w-max items-stretch">
+          {visibleCards.map((card, index) => {
             const ui = cardState[card.key] ?? {
               hidden: false,
               selected: false,
@@ -420,17 +479,36 @@ function EcommerceMatchStrip({
             };
 
             return (
-              <MatchCardItem
-                key={card.key}
-                card={card}
-                quantity={ui.quantity}
-                isSelected={ui.selected}
-                isMarkedHidden={ui.hidden}
-                hideEcommerceBadge
-                onQuantityChange={(next) => onQuantityChange(card.key, next)}
-                onToggleHidden={() => onToggleHidden(card.key, ui.hidden)}
-                onToggleSelected={() => onToggleSelected(card.key)}
-              />
+              <Fragment key={card.key}>
+                {index > 0 && showScrollControls ? (
+                  <div
+                    role="separator"
+                    aria-label="Trascina per scorrere i prodotti"
+                    onPointerDown={handleDragPointerDown}
+                    onPointerMove={handleDragPointerMove}
+                    onPointerUp={handleDragPointerEnd}
+                    onPointerCancel={handleDragPointerEnd}
+                    className={`hidden w-3 shrink-0 items-center justify-center self-stretch text-zinc-300 transition-colors hover:text-zinc-500 [@media(hover:hover)_and_(pointer:fine)]:flex dark:text-zinc-600 dark:hover:text-zinc-400 ${
+                      isDragging ? "cursor-grabbing" : "cursor-grab"
+                    }`}
+                  >
+                    <GripVertical className="h-4 w-4" aria-hidden="true" />
+                  </div>
+                ) : null}
+
+                <div data-strip-card className="shrink-0">
+                  <MatchCardItem
+                    card={card}
+                    quantity={ui.quantity}
+                    isSelected={ui.selected}
+                    isMarkedHidden={ui.hidden}
+                    hideEcommerceBadge
+                    onQuantityChange={(next) => onQuantityChange(card.key, next)}
+                    onToggleHidden={() => onToggleHidden(card.key, ui.hidden)}
+                    onToggleSelected={() => onToggleSelected(card.key)}
+                  />
+                </div>
+              </Fragment>
             );
           })}
         </div>
