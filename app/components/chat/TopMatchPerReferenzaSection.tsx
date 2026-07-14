@@ -572,6 +572,7 @@ export function TopMatchPerReferenzaSection({
   confronto,
   cardState,
   onCardStateChange,
+  onCardQuantityChange,
   onToggleSelected,
   onAddReferenza,
   onRemoveReferenza,
@@ -585,6 +586,7 @@ export function TopMatchPerReferenzaSection({
   confronto: RisultatoConfronto;
   cardState: CardStateMap;
   onCardStateChange: (next: CardStateMap) => void;
+  onCardQuantityChange?: (key: string, next: number) => void;
   onToggleSelected: (cardKey: string) => void;
   onAddReferenza?: (insertAfterIndex: number, productName: string) => void;
   onRemoveReferenza?: (queryIndex: number) => void;
@@ -748,6 +750,11 @@ export function TopMatchPerReferenzaSection({
     key: string,
     patch: Partial<CardStateMap[string]>
   ) => {
+    if (patch.quantity != null && onCardQuantityChange) {
+      onCardQuantityChange(key, patch.quantity);
+      return;
+    }
+
     const current = cardState[key] ?? {
       hidden: false,
       selected: false,
@@ -982,7 +989,7 @@ export function TopMatchPerReferenzaSection({
                         className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-light text-zinc-600 transition-colors hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:bg-zinc-800"
                       >
                         <Plus className="h-4 w-4" />
-                        aggiungi prodotto 🔎
+                        aggiungi nuovo prodotto 🔎
                       </button>
                     </div>
                   )}

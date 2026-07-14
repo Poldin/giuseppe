@@ -5,6 +5,7 @@ import {
 } from "@/app/lib/search/chat-store";
 import { addReferenzaToConfronto } from "@/app/lib/search/merge-referenza";
 import { shiftUserCardStateAfterInsert } from "@/app/lib/search/card-selection-state";
+import { shiftCommittedAfterInsert } from "@/app/lib/search/committed-scenario";
 import type { RisultatoConfronto } from "@/app/lib/search/elabora-scenari";
 
 type RouteContext = {
@@ -69,12 +70,17 @@ export async function POST(request: Request, context: RouteContext) {
       confronto.user_card_state,
       insertAfterIndex
     );
+    const user_committed_scenario = shiftCommittedAfterInsert(
+      confronto.user_committed_scenario ?? [],
+      insertAfterIndex
+    );
 
     await updateProductSearchChat(id, {
       products: updated.prodotti_richiesti,
       results: {
         ...updated,
         user_card_state,
+        user_committed_scenario,
       },
     });
 

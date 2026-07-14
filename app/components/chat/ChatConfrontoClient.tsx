@@ -12,14 +12,30 @@ import {
   catalogFromConfronto,
   mergeCardStateAfterInsert,
   mergeCardStateWithSaved,
+  parseCardKey,
   removeCardStateForReferenza,
   sanitizeCardStateForSave,
   toggleCardSelected,
   type CardMeta,
   type CardStateMap,
 } from "@/app/lib/search/card-selection-state";
+import {
+  assignmentsFromScenario,
+  buildPendingFingerprint,
+  buildScenarioFromAssignments,
+  computePendingChanges,
+  filterCommittedAssignments,
+  parseCommittedScenarioPayload,
+  removeCommittedAssignment,
+  removeCommittedForReferenza,
+  replaceCommittedWithOptimal,
+  sanitizeCommittedScenarioForSave,
+  shiftCommittedAfterInsert,
+  updateCommittedQuantity,
+  upsertCommittedAssignment,
+} from "@/app/lib/search/committed-scenario";
 import { elaboraConfrontoUtente } from "@/app/lib/search/elabora-confronto-utente";
-import type { EcommerceInfo } from "@/app/lib/search/elabora-scenari-types";
+import type { CommittedAssignment, EcommerceInfo } from "@/app/lib/search/elabora-scenari-types";
 import type {
   RisultatoConfronto,
   RigaTopMatch,
@@ -32,6 +48,55 @@ function formatPrice(value: number): string {
     style: "currency",
     currency: "EUR",
   }).format(value);
+}
+
+function buildQueryIndexByOffertaId(cards: CardMeta[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const card of cards) {
+    map.set(card.offerta.id, card.queryIndex);
+  }
+  return map;
+}
+
+function buildValidOfferIds(cards: CardMeta[]): Set<string> {
+  return new Set(cards.map((card) => card.offerta.id));
+}
+
+function resolveInitialCommittedAssignments(input: {
+  confronto: RisultatoConfronto;
+  cards: CardMeta[];
+  cardState: CardStateMap;
+  catalogoEcommerce: EcommerceInfo[];
+}): CommittedAssignment[] {
+  const queryIndexByOffertaId = buildQueryIndexByOffertaId(input.cards);
+  const validOfferIds = buildValidOfferIds(input.cards);
+  const maxQueryIndex = input.confronto.prodotti_richiesti.length - 1;
+  const saved = parseCommittedScenarioPayload(
+    input.confronto.user_committed_scenario
+  );
+
+  if (saved) {
+    const filtered = filterCommittedAssignments(
+      saved,
+      validOfferIds,
+      maxQueryIndex
+    );
+    if (filtered.length > 0) {
+      return filtered;
+    }
+  }
+
+  const selezioni = buildSelezioneFromState(input.cards, input.cardState);
+  const calcolo = elaboraConfrontoUtente({
+    prodottiRichiesti: input.confronto.prodotti_richiesti,
+    selezioni,
+    catalogoEcommerce: input.catalogoEcommerce,
+  });
+
+  return assignmentsFromScenario(
+    calcolo.scenario_risparmio,
+    queryIndexByOffertaId
+  );
 }
 
 export function ChatConfrontoClient({
@@ -57,6 +122,22 @@ export function ChatConfrontoClient({
 
   const [cards, setCards] = useState<CardMeta[]>(initial.cards);
   const [cardState, setCardState] = useState<CardStateMap>(initial.state);
+  const [catalogoEcommerce, setCatalogoEcommerce] = useState<EcommerceInfo[]>(
+    () => catalogFromConfronto(confronto)
+  );
+  const [committedAssignments, setCommittedAssignments] = useState<
+    CommittedAssignment[]
+  >(() =>
+    resolveInitialCommittedAssignments({
+      confronto: initialConfronto,
+      cards: initial.cards,
+      cardState: initial.state,
+      catalogoEcommerce: catalogFromConfronto(initialConfronto),
+    })
+  );
+  const [dismissedPendingFingerprint, setDismissedPendingFingerprint] =
+    useState<string | null>(null);
+
   const saveEnabledRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isAddingReferenza, setIsAddingReferenza] = useState(false);
@@ -67,9 +148,6 @@ export function ChatConfrontoClient({
   const [removeReferenzaError, setRemoveReferenzaError] = useState<
     string | null
   >(null);
-  const [catalogoEcommerce, setCatalogoEcommerce] = useState<EcommerceInfo[]>(
-    () => catalogFromConfronto(confronto)
-  );
 
   useEffect(() => {
     const hasShippingTiers = catalogoEcommerce.some(
@@ -87,14 +165,67 @@ export function ChatConfrontoClient({
       });
   }, [catalogoEcommerce]);
 
+  const selezioni = useMemo(
+    () => buildSelezioneFromState(cards, cardState),
+    [cards, cardState]
+  );
+
   const calcolo = useMemo(() => {
-    const selezioni = buildSelezioneFromState(cards, cardState);
     return elaboraConfrontoUtente({
       prodottiRichiesti: confronto.prodotti_richiesti,
       selezioni,
       catalogoEcommerce,
     });
-  }, [cards, cardState, confronto, catalogoEcommerce]);
+  }, [selezioni, confronto, catalogoEcommerce]);
+
+  const queryIndexByOffertaId = useMemo(
+    () => buildQueryIndexByOffertaId(cards),
+    [cards]
+  );
+
+  const committedScenario = useMemo(
+    () =>
+      buildScenarioFromAssignments(committedAssignments, {
+        prodottiRichiesti: confronto.prodotti_richiesti,
+        selezioni,
+        catalogoEcommerce,
+      }),
+    [
+      committedAssignments,
+      confronto.prodotti_richiesti,
+      selezioni,
+      catalogoEcommerce,
+    ]
+  );
+
+  const pending = useMemo(
+    () =>
+      computePendingChanges({
+        committedAssignments,
+        committedScenario,
+        optimalScenario: calcolo.scenario_risparmio,
+        prodottiRichiesti: confronto.prodotti_richiesti,
+        catalogoEcommerce,
+        queryIndexByOffertaId,
+      }),
+    [
+      committedAssignments,
+      committedScenario,
+      calcolo.scenario_risparmio,
+      confronto.prodotti_richiesti,
+      catalogoEcommerce,
+      queryIndexByOffertaId,
+    ]
+  );
+
+  const pendingFingerprint = useMemo(
+    () => buildPendingFingerprint(pending.changes, pending.savingsDelta),
+    [pending.changes, pending.savingsDelta]
+  );
+
+  const showPendingOptimization =
+    pending.changes.length > 0 &&
+    pendingFingerprint !== dismissedPendingFingerprint;
 
   const catalogById = Object.fromEntries(
     calcolo.tabelle_ecommerce.map((t) => [t.ecommerce_id, t])
@@ -126,11 +257,17 @@ export function ChatConfrontoClient({
 
     saveTimerRef.current = setTimeout(() => {
       const payload = sanitizeCardStateForSave(cardState, cards);
+      const committedPayload = sanitizeCommittedScenarioForSave(
+        committedAssignments
+      );
 
       void fetch(`/api/chat/${chatId}/selections`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cardState: payload }),
+        body: JSON.stringify({
+          cardState: payload,
+          committedScenario: committedPayload,
+        }),
       }).catch((error) => {
         console.error("Salvataggio selezioni fallito:", error);
       });
@@ -141,7 +278,21 @@ export function ChatConfrontoClient({
         clearTimeout(saveTimerRef.current);
       }
     };
-  }, [cardState, cards, chatId]);
+  }, [cardState, cards, chatId, committedAssignments]);
+
+  const handleAcceptPending = useCallback(() => {
+    setCommittedAssignments(
+      replaceCommittedWithOptimal(
+        calcolo.scenario_risparmio,
+        queryIndexByOffertaId
+      )
+    );
+    setDismissedPendingFingerprint(null);
+  }, [calcolo.scenario_risparmio, queryIndexByOffertaId]);
+
+  const handleRejectPending = useCallback(() => {
+    setDismissedPendingFingerprint(pendingFingerprint);
+  }, [pendingFingerprint]);
 
   const handleAddReferenza = useCallback(
     async (insertAfterIndex: number, productName: string) => {
@@ -175,6 +326,31 @@ export function ChatConfrontoClient({
         );
         setCards(merged.cards);
         setCardState(merged.state);
+
+        const newQueryIndex = insertAfterIndex + 1;
+        const shiftedCommitted = shiftCommittedAfterInsert(
+          committedAssignments,
+          insertAfterIndex
+        );
+        const nextCards = merged.cards;
+        const nextState = merged.state;
+        const nextSelezioni = buildSelezioneFromState(nextCards, nextState);
+        const nextCalcolo = elaboraConfrontoUtente({
+          prodottiRichiesti: payload.confronto.prodotti_richiesti,
+          selezioni: nextSelezioni,
+          catalogoEcommerce,
+        });
+        const nextQueryIndexByOffertaId = buildQueryIndexByOffertaId(nextCards);
+        const optimalForNewRow = assignmentsFromScenario(
+          nextCalcolo.scenario_risparmio,
+          nextQueryIndexByOffertaId
+        ).find((assignment) => assignment.query_index === newQueryIndex);
+
+        setCommittedAssignments(
+          optimalForNewRow
+            ? upsertCommittedAssignment(shiftedCommitted, optimalForNewRow)
+            : shiftedCommitted
+        );
       } catch (error) {
         setAddReferenzaError(
           error instanceof Error ? error.message : "Errore durante l'aggiunta"
@@ -183,20 +359,12 @@ export function ChatConfrontoClient({
         setIsAddingReferenza(false);
       }
     },
-    [cardState, cards, chatId]
+    [cardState, cards, chatId, catalogoEcommerce, committedAssignments]
   );
 
   const risparmioAssolutoRef = useRef<HTMLDivElement>(null);
   const scrollToReferenzaRef = useRef<(queryIndex: number) => void>(() => {});
   const openAddReferenzaRef = useRef<() => void>(() => {});
-
-  const queryIndexByOffertaId = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const card of cards) {
-      map.set(card.offerta.id, card.queryIndex);
-    }
-    return map;
-  }, [cards]);
 
   const scrollToRisparmioAssoluto = useCallback(() => {
     const element = risparmioAssolutoRef.current;
@@ -231,8 +399,88 @@ export function ChatConfrontoClient({
           },
         };
       });
+      setCommittedAssignments((current) =>
+        updateCommittedQuantity(current, input.queryIndex, input.next)
+      );
     },
     []
+  );
+
+  const handleTopMatchQuantityChange = useCallback(
+    (key: string, next: number) => {
+      const parsed = parseCardKey(key);
+      if (!parsed) {
+        return;
+      }
+
+      setCardState((current) => {
+        const ui = current[key] ?? {
+          hidden: false,
+          selected: false,
+          quantity: 1,
+        };
+        return {
+          ...current,
+          [key]: {
+            ...ui,
+            quantity: Math.max(1, next),
+          },
+        };
+      });
+
+      setCommittedAssignments((current) => {
+        const assignment = current.find(
+          (entry) => entry.query_index === parsed.queryIndex
+        );
+        if (
+          !assignment ||
+          assignment.ecommerce_id !== parsed.ecommerceId ||
+          assignment.offerta_id !== parsed.offertaId
+        ) {
+          return current;
+        }
+
+        return updateCommittedQuantity(current, parsed.queryIndex, next);
+      });
+    },
+    []
+  );
+
+  const handleToggleSelected = useCallback(
+    (cardKey: string) => {
+      const card = cards.find((item) => item.key === cardKey);
+      if (!card) {
+        return;
+      }
+
+      const nextState = toggleCardSelected(cardState, card, cards);
+      setCardState(nextState);
+
+      const nextSelezioni = buildSelezioneFromState(cards, nextState);
+      const nextCalcolo = elaboraConfrontoUtente({
+        prodottiRichiesti: confronto.prodotti_richiesti,
+        selezioni: nextSelezioni,
+        catalogoEcommerce,
+      });
+      const optimalForRow = assignmentsFromScenario(
+        nextCalcolo.scenario_risparmio,
+        queryIndexByOffertaId
+      ).find((assignment) => assignment.query_index === card.queryIndex);
+
+      setCommittedAssignments((current) => {
+        if (optimalForRow) {
+          return upsertCommittedAssignment(current, optimalForRow);
+        }
+        return removeCommittedAssignment(current, card.queryIndex);
+      });
+    },
+    [
+      cardState,
+      cards,
+      catalogoEcommerce,
+      confronto.prodotti_richiesti,
+      queryIndexByOffertaId,
+    ]
   );
 
   const scrollToEcommerceTable = useCallback((ecommerceId: string) => {
@@ -301,6 +549,9 @@ export function ChatConfrontoClient({
         );
         setCards(updated.cards);
         setCardState(updated.state);
+        setCommittedAssignments((current) =>
+          removeCommittedForReferenza(current, payload.queryIndex!)
+        );
       } catch (error) {
         setRemoveReferenzaError(
           error instanceof Error
@@ -320,13 +571,18 @@ export function ChatConfrontoClient({
         type="button"
         onClick={scrollToRisparmioAssoluto}
         className="fixed top-3 right-3 z-50 flex items-center gap-1.5 rounded-2xl border border-zinc-200 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-sm transition-transform hover:scale-[1.02] active:scale-[0.98] sm:top-4 sm:right-4 sm:gap-2 sm:px-4 sm:py-3 dark:border-zinc-700 dark:bg-zinc-900/95"
-        aria-label={`Risparmio assoluto: ${formatPrice(calcolo.scenario_risparmio.prezzo_totale)}. Vai alla sezione.`}
+        aria-label={`Risparmio assoluto: ${formatPrice(committedScenario.prezzo_totale)}. Vai alla sezione.`}
       >
         <span className="text-2xl leading-none sm:text-3xl" aria-hidden="true">
           💸
         </span>
+        {showPendingOptimization ? (
+          <span className="text-lg leading-none sm:text-xl" aria-hidden="true">
+            ⚡
+          </span>
+        ) : null}
         <span className="text-base font-bold tabular-nums tracking-tight sm:text-xl">
-          {formatPrice(calcolo.scenario_risparmio.prezzo_totale)}
+          {formatPrice(committedScenario.prezzo_totale)}
         </span>
       </button>
 
@@ -338,7 +594,7 @@ export function ChatConfrontoClient({
           className="scroll-mt-24 outline-none md:col-span-7"
         >
           <ScenarioCard
-            scenario={calcolo.scenario_risparmio}
+            scenario={committedScenario}
             catalogById={catalogById}
             tiersByEcommerce={tiersByEcommerce}
             queryIndexByOffertaId={queryIndexByOffertaId}
@@ -351,6 +607,11 @@ export function ChatConfrontoClient({
             canRemoveReferenza={confronto.prodotti_richiesti.length > 1}
             onOpenAddReferenza={() => openAddReferenzaRef.current()}
             isAddingReferenza={isAddingReferenza}
+            showPendingOptimization={showPendingOptimization}
+            pendingChanges={pending.changes}
+            savingsDelta={pending.savingsDelta}
+            onAcceptPending={handleAcceptPending}
+            onRejectPending={handleRejectPending}
           />
         </div>
 
@@ -367,13 +628,10 @@ export function ChatConfrontoClient({
         confronto={confronto}
         cardState={cardState}
         onCardStateChange={setCardState}
+        onCardQuantityChange={handleTopMatchQuantityChange}
         onRegisterScrollToReferenza={handleRegisterScrollToReferenza}
         onRegisterOpenAddReferenza={handleRegisterOpenAddReferenza}
-        onToggleSelected={(cardKey) => {
-          const card = cards.find((item) => item.key === cardKey);
-          if (!card) return;
-          setCardState((current) => toggleCardSelected(current, card, cards));
-        }}
+        onToggleSelected={handleToggleSelected}
         onAddReferenza={(insertAfterIndex, productName) => {
           void handleAddReferenza(insertAfterIndex, productName);
         }}

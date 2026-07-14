@@ -9,8 +9,10 @@ import type {
 
 export type {
   CandidatoEcommerce,
+  CommittedAssignment,
   EcommerceInfo,
   ElaboraConfig,
+  PendingRowChange,
   ProdottoOfferta,
   ProdottoRiga,
   RigaTopMatch,

@@ -4,6 +4,7 @@ import {
   updateProductSearchChat,
 } from "@/app/lib/search/chat-store";
 import { parseCardStatePayload } from "@/app/lib/search/card-selection-state";
+import { parseCommittedScenarioPayload } from "@/app/lib/search/committed-scenario";
 import type { RisultatoConfronto } from "@/app/lib/search/elabora-scenari";
 
 type RouteContext = {
@@ -22,8 +23,14 @@ function isConfronto(value: unknown): value is RisultatoConfronto {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const body = (await request.json()) as { cardState?: unknown };
+    const body = (await request.json()) as {
+      cardState?: unknown;
+      committedScenario?: unknown;
+    };
     const cardState = parseCardStatePayload(body.cardState);
+    const committedScenario = parseCommittedScenarioPayload(
+      body.committedScenario
+    );
 
     if (!cardState) {
       return NextResponse.json(
@@ -42,6 +49,7 @@ export async function POST(request: Request, context: RouteContext) {
       results: {
         ...chat.results,
         user_card_state: cardState,
+        user_committed_scenario: committedScenario ?? undefined,
       },
     });
 

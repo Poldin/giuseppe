@@ -107,6 +107,27 @@ export type UserCardUiState = {
 
 export type UserCardStateMap = Record<string, UserCardUiState>;
 
+export type CommittedAssignment = {
+  query_index: number;
+  ecommerce_id: string;
+  offerta_id: string;
+  quantita: number;
+};
+
+export type PendingRowAssignment = {
+  ecommerceId: string;
+  ecommerceName: string;
+  productName: string;
+  quantita: number;
+};
+
+export type PendingRowChange = {
+  queryIndex: number;
+  queryText: string;
+  committed: PendingRowAssignment | null;
+  optimal: PendingRowAssignment;
+};
+
 export type RisultatoConfronto = {
   prodotti_richiesti: string[];
   top_match_per_referenza?: RigaTopMatch[];
@@ -115,6 +136,7 @@ export type RisultatoConfronto = {
   scenario_risparmio: ScenarioCarrello;
   scenario_monopolista: ScenarioCarrello;
   user_card_state?: UserCardStateMap;
+  user_committed_scenario?: CommittedAssignment[];
 };
 
 export type ElaboraConfig = {

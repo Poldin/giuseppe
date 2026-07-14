@@ -5,6 +5,7 @@ import {
 } from "@/app/lib/search/chat-store";
 import { removeReferenzaFromConfronto } from "@/app/lib/search/merge-referenza";
 import { removeUserCardStateForReferenza } from "@/app/lib/search/card-selection-state";
+import { removeCommittedForReferenza } from "@/app/lib/search/committed-scenario";
 import type { RisultatoConfronto } from "@/app/lib/search/elabora-scenari";
 
 type RouteContext = {
@@ -43,12 +44,17 @@ export async function POST(request: Request, context: RouteContext) {
       chat.results.user_card_state,
       queryIndex
     );
+    const user_committed_scenario = removeCommittedForReferenza(
+      chat.results.user_committed_scenario ?? [],
+      queryIndex
+    );
 
     await updateProductSearchChat(id, {
       products: updated.prodotti_richiesti,
       results: {
         ...updated,
         user_card_state,
+        user_committed_scenario,
       },
     });
 
