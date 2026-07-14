@@ -188,6 +188,12 @@ export default function HomeSearchBox() {
         throw new Error(payload.error ?? "Errore durante l'invio");
       }
 
+      try {
+        sessionStorage.setItem("giuseppe:autoAnalisi", "1");
+      } catch {
+        // ignore storage errors (private mode, etc.)
+      }
+
       router.push(`/chat/${payload.chatId}`);
     } catch (submitError) {
       setError(

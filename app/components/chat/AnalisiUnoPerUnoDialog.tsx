@@ -144,7 +144,13 @@ function IntroSlidePanel({
   onStart: () => void;
 }) {
   const [activeTab, setActiveTab] = useState(0);
+  const [autoRotateEpoch, setAutoRotateEpoch] = useState(0);
   const step = INTRO_STEPS[activeTab];
+
+  const selectTab = useCallback((index: number) => {
+    setActiveTab(index);
+    setAutoRotateEpoch((current) => current + 1);
+  }, []);
 
   useEffect(() => {
     if (!active) {
@@ -157,7 +163,7 @@ function IntroSlidePanel({
     }, 8000);
 
     return () => window.clearInterval(timer);
-  }, [active]);
+  }, [active, autoRotateEpoch]);
 
   const renderTabDemo = () => {
     switch (activeTab) {
@@ -198,7 +204,7 @@ function IntroSlidePanel({
             <button
               key={item.title}
               type="button"
-              onClick={() => setActiveTab(index)}
+              onClick={() => selectTab(index)}
               aria-selected={selected}
               className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors sm:text-sm ${
                 selected

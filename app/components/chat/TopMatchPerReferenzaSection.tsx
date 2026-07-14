@@ -644,6 +644,7 @@ export function TopMatchPerReferenzaSection({
   const [addingAfterIndex, setAddingAfterIndex] = useState<number | null>(null);
   const [deleteArmedIndex, setDeleteArmedIndex] = useState<number | null>(null);
   const [analisiOpen, setAnalisiOpen] = useState(false);
+  const autoOpenedAnalisiRef = useRef(false);
   const prevAddingReferenza = useRef(isAddingReferenza);
   const prevRemovingReferenza = useRef(isRemovingReferenza);
   const pendingScrollToAddRef = useRef<number | null>(null);
@@ -797,6 +798,25 @@ export function TopMatchPerReferenzaSection({
       groups,
     };
   }, [rowsWithCards, ecommerceOrder]);
+
+  useEffect(() => {
+    if (autoOpenedAnalisiRef.current || !introDemoData) {
+      return;
+    }
+
+    try {
+      if (sessionStorage.getItem("giuseppe:autoAnalisi") !== "1") {
+        return;
+      }
+
+      sessionStorage.removeItem("giuseppe:autoAnalisi");
+    } catch {
+      return;
+    }
+
+    autoOpenedAnalisiRef.current = true;
+    setAnalisiOpen(true);
+  }, [introDemoData]);
 
   const rowsByQueryIndex = useMemo(
     () => new Map(rowsWithCards.map((entry) => [entry.row.query_index, entry])),
