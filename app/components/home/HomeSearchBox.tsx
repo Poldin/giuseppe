@@ -224,7 +224,7 @@ export default function HomeSearchBox() {
       <div className="mt-4">
         <div className="mb-2 flex items-center justify-between gap-2">
           <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-            potrebbe servirti
+            potrebbero servirti
           </p>
           {showScrollControls ? (
             <div className="flex items-center gap-1">

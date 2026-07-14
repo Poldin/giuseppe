@@ -3,13 +3,15 @@ import sys
 import time
 import random
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import create_client, Client
+
+from scrape_session import prompt_session_id
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 load_dotenv(ROOT_DIR / ".env.local")
@@ -276,7 +278,9 @@ def scrape_page(page_number: int) -> str | None:
     return html
 
 
-def parse_and_save(html_content: str | None, page_number: int) -> int | None:
+def parse_and_save(
+    html_content: str | None, page_number: int, session_id: str
+) -> int | None:
     if not html_content:
         log(f"Pagina {page_number}: nessun HTML, salto salvataggio")
         return None
@@ -316,7 +320,9 @@ def parse_and_save(html_content: str | None, page_number: int) -> int | None:
                 "id_ecommerce": parsed["id_ecommerce"],
                 "discount": parsed["discount"],
                 "brand": parsed["brand"],
-                "update_at": datetime.now().isoformat(),
+                "update_at": datetime.now(timezone.utc).isoformat(),
+                "update_session_id": session_id,
+                "is_escluded": False,
                 "other": {
                     "tag": parsed["tag"],
                     "original_url": product_url,
@@ -379,7 +385,9 @@ if __name__ == "__main__":
 
     total_pages = prompt_total_pages()
     page = prompt_start_page(total_pages)
+    session_id = prompt_session_id(supabase, ECOMMERCE_ID, "Dentaltix")
     log(f"Configurazione: pagine {page} → {total_pages} (totale {total_pages - page + 1})")
+    log(f"Session ID: {session_id}")
 
     while True:
         if page > total_pages:
@@ -391,7 +399,7 @@ if __name__ == "__main__":
 
         log(f"--- Inizio pagina {page}/{total_pages} ---")
         html = scrape_page(page)
-        result = parse_and_save(html, page)
+        result = parse_and_save(html, page, session_id)
 
         if result == -1:
             log(f"Pagina {page}: nessun prodotto, fine scraping")
