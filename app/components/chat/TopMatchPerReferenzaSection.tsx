@@ -867,7 +867,7 @@ export function TopMatchPerReferenzaSection({
               <article
                 id={`referenza-${row.query_index}`}
                 tabIndex={-1}
-                className="min-w-0 scroll-mt-24 rounded-2xl border border-zinc-200/80 bg-zinc-200 p-4 outline-none dark:border-zinc-900 dark:bg-zinc-900/50 sm:p-5"
+                className="min-w-0 scroll-mt-24 rounded-2xl border border-zinc-200/80 bg-zinc-100 p-4 outline-none dark:border-zinc-900 dark:bg-zinc-900/50 sm:p-5"
               >
                 <div className={isCollapsed ? "" : "mb-4"}>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
