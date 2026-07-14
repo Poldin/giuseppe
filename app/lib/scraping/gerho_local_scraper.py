@@ -12,6 +12,7 @@ from playwright.sync_api import sync_playwright
 from supabase import create_client, Client
 
 from scrape_session import prompt_session_id
+from scrape_pages import prompt_page_plan, prompt_total_pages, resolve_pages
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 load_dotenv(ROOT_DIR / ".env.local")
@@ -217,38 +218,6 @@ def scrape_page(page_number):
     return html
 
 
-def prompt_total_pages() -> int:
-    print()
-    print(f"Apri {STUDIO_BASE_URL} nel browser e controlla quante pagine ci sono in totale.")
-    while True:
-        raw = input("Quante sono le pagine totali? ").strip()
-        try:
-            total = int(raw)
-            if total >= 1:
-                return total
-            print("Inserisci un numero >= 1.")
-        except ValueError:
-            print("Numero non valido, riprova.")
-
-
-def prompt_start_page(total_pages: int) -> int:
-    print()
-    print("Da quale pagina vuoi partire?")
-    print('  Premi "y" (o Invio) per iniziare dalla pagina 1')
-    print(f"  Oppure inserisci un numero da 1 a {total_pages}")
-    while True:
-        raw = input("> ").strip().lower()
-        if raw in ("", "y", "yes", "s", "si", "sì"):
-            return 1
-        try:
-            start = int(raw)
-            if 1 <= start <= total_pages:
-                return start
-            print(f"Inserisci un numero tra 1 e {total_pages}.")
-        except ValueError:
-            print('Premi "y" per la pagina 1, oppure inserisci un numero.')
-
-
 def parse_and_save(html_content, page_number, session_id: str) -> int | None:
     if not html_content:
         log(f"Pagina {page_number}: nessun HTML, salto salvataggio")
@@ -268,6 +237,8 @@ def parse_and_save(html_content, page_number, session_id: str) -> int | None:
 
     batch_data = []
     skipped = 0
+    duplicate_ids = 0
+    seen_ids: set[str] = set()
 
     for item in product_items:
         try:
@@ -282,6 +253,11 @@ def parse_and_save(html_content, page_number, session_id: str) -> int | None:
             if not sku or not product_name or final_price is None:
                 skipped += 1
                 continue
+
+            if sku in seen_ids:
+                duplicate_ids += 1
+                continue
+            seen_ids.add(sku)
 
             record = {
                 "product_name": product_name,
@@ -305,7 +281,10 @@ def parse_and_save(html_content, page_number, session_id: str) -> int | None:
             log(f"Pagina {page_number}: errore parsing singolo prodotto -> {type(e).__name__}: {e}")
             continue
 
-    log(f"Pagina {page_number}: {len(batch_data)} prodotti validi, {skipped} scartati")
+    log(
+        f"Pagina {page_number}: {len(batch_data)} prodotti validi, "
+        f"{skipped} scartati, {duplicate_ids} duplicati sku"
+    )
 
     if batch_data:
         try:
@@ -346,29 +325,48 @@ if __name__ == "__main__":
         print()
         sys.exit(1)
 
-    total_pages = prompt_total_pages()
-    page = prompt_start_page(total_pages)
+    page_plan = prompt_page_plan()
+    total_pages: int | None = None
+    if page_plan.mode == "range":
+        total_pages = prompt_total_pages(STUDIO_BASE_URL)
+
+    try:
+        pages_to_scrape = resolve_pages(page_plan, total_pages)
+    except ValueError as exc:
+        log(f"Configurazione pagine non valida: {exc}")
+        sys.exit(1)
+
     session_id = prompt_session_id(supabase, ECOMMERCE_ID, "Gerhò")
-    log(f"Configurazione: pagine {page} → {total_pages} (totale {total_pages - page + 1})")
+
+    if page_plan.mode == "list":
+        log(f"Configurazione: pagine specifiche {pages_to_scrape}")
+    else:
+        log(
+            f"Configurazione: pagine {page_plan.start_page} → {total_pages} "
+            f"(totale {len(pages_to_scrape)})"
+        )
     log(f"Session ID: {session_id}")
 
-    while True:
-        if page > total_pages:
-            log(f"Raggiunta ultima pagina ({total_pages}), stop")
-            break
+    for index, page in enumerate(pages_to_scrape, start=1):
         if page > 1000:
             log("Limite sicurezza 1000 pagine raggiunto, stop")
             break
 
-        log(f"--- Inizio pagina {page}/{total_pages} ---")
+        if page_plan.mode == "list":
+            log(f"--- Inizio pagina {page} ({index}/{len(pages_to_scrape)}) ---")
+        else:
+            log(f"--- Inizio pagina {page}/{total_pages} ---")
+
         html = scrape_page(page)
         result = parse_and_save(html, page, session_id)
 
         if result == -1:
-            log(f"Pagina {page}: nessun prodotto, fine scraping")
+            log(f"Pagina {page}: nessun prodotto, stop")
             break
 
-        pause = random.uniform(2.5, 5.0)
-        log(f"Pagina {page}: pausa {pause:.1f}s prima della prossima")
-        time.sleep(pause)
-        page += 1
+        if index < len(pages_to_scrape):
+            pause = random.uniform(2.5, 5.0)
+            log(f"Pagina {page}: pausa {pause:.1f}s prima della prossima")
+            time.sleep(pause)
+
+    log("=== Scraping Gerhò completato ===")
