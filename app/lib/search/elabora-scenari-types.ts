@@ -117,8 +117,12 @@ export type CommittedAssignment = {
 export type PendingRowAssignment = {
   ecommerceId: string;
   ecommerceName: string;
+  ecommerceLogoUrl: string | null;
   productName: string;
   quantita: number;
+  prezzoUnitario: number;
+  prezzoRiga: number;
+  brand?: string | null;
 };
 
 export type PendingRowChange = {
@@ -126,6 +130,20 @@ export type PendingRowChange = {
   queryText: string;
   committed: PendingRowAssignment | null;
   optimal: PendingRowAssignment;
+};
+
+export type PendingOptimizationSummary = {
+  savingsDelta: number;
+  committed: {
+    prezzoProdotti: number;
+    prezzoSpedizione: number;
+    prezzoTotale: number;
+  };
+  optimal: {
+    prezzoProdotti: number;
+    prezzoSpedizione: number;
+    prezzoTotale: number;
+  };
 };
 
 export type RisultatoConfronto = {

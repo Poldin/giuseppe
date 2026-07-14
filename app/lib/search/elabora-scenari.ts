@@ -12,6 +12,8 @@ export type {
   CommittedAssignment,
   EcommerceInfo,
   ElaboraConfig,
+  PendingOptimizationSummary,
+  PendingRowAssignment,
   PendingRowChange,
   ProdottoOfferta,
   ProdottoRiga,

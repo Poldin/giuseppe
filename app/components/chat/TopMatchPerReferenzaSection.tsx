@@ -13,7 +13,13 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
+import {
+  AnalisiUnoPerUnoDialog,
+  type AnalisiReferenzaSlide,
+  type IntroDemoData,
+} from "@/app/components/chat/AnalisiUnoPerUnoDialog";
 import { ProductSearchCombobox } from "@/app/components/home/ProductSearchCombobox";
+import { EcommerceLogoBadge } from "@/app/components/chat/EcommerceLogoBadge";
 import { QuantityControl } from "@/app/components/chat/QuantityControl";
 import type { CardStateMap } from "@/app/lib/search/card-selection-state";
 import type {
@@ -189,20 +195,10 @@ function MatchCardItem({
       <div className="mb-3 flex flex-wrap items-center gap-2 pr-8">
 
         {!hideEcommerceBadge ? (
-          <div className="inline-flex h-5 max-w-full items-center rounded-md bg-white px-2 py-0.5 ring-1 ring-zinc-100 dark:ring-zinc-800">
-            {col.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={col.logo_url}
-                alt={col.ecommerce_name}
-                className="h-full w-auto max-w-28 object-contain object-left"
-              />
-            ) : (
-              <span className="text-xs font-bold uppercase text-zinc-600">
-                {col.ecommerce_name.slice(0, 2)}
-              </span>
-            )}
-          </div>
+          <EcommerceLogoBadge
+            logoUrl={col.logo_url}
+            name={col.ecommerce_name}
+          />
         ) : null}
 
         {productUrl ? (
@@ -416,20 +412,11 @@ function EcommerceMatchStrip({
     <div className="flex min-w-0 flex-col gap-2">
       <div className="flex items-center justify-between gap-2 px-1">
         <div className="flex min-w-0 items-center gap-2">
-          <div className="inline-flex h-5 max-w-full items-center rounded-md bg-white px-2 py-0.5 ring-1 ring-zinc-100 dark:ring-zinc-800">
-            {group.col.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={group.col.logo_url}
-                alt={group.col.ecommerce_name}
-                className="h-full w-auto max-w-28 object-contain object-left"
-              />
-            ) : (
-              <span className="text-xs font-bold uppercase text-zinc-600">
-                {group.col.ecommerce_name}
-              </span>
-            )}
-          </div>
+          <EcommerceLogoBadge
+            logoUrl={group.col.logo_url}
+            name={group.col.ecommerce_name}
+            fallback="full"
+          />
           <span className="whitespace-nowrap text-xs text-zinc-500 sm:text-sm dark:text-zinc-400">
             totale: {group.cards.length}
           </span>
@@ -568,6 +555,49 @@ export function AddReferenzaInlineRow({
   );
 }
 
+function ReferenzaMatchContent({
+  orderedGroups,
+  matchCards,
+  cardState,
+  onQuantityChange,
+  onToggleSelected,
+  onAddAsReferenza,
+  isAddingReferenza = false,
+}: {
+  orderedGroups: EcommerceMatchGroup[];
+  matchCards: MatchCard[];
+  cardState: CardStateMap;
+  onQuantityChange: (key: string, next: number) => void;
+  onToggleSelected: (key: string) => void;
+  onAddAsReferenza?: (productName: string) => void;
+  isAddingReferenza?: boolean;
+}) {
+  if (matchCards.length === 0) {
+    return (
+      <p className="text-sm text-zinc-500">
+        Nessun match trovato per questa referenza.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      {orderedGroups.map((group) => (
+        <EcommerceMatchStrip
+          key={group.ecommerceId}
+          group={group}
+          visibleCards={group.cards}
+          cardState={cardState}
+          onQuantityChange={onQuantityChange}
+          onToggleSelected={onToggleSelected}
+          onAddAsReferenza={onAddAsReferenza}
+          isAddingReferenza={isAddingReferenza}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function TopMatchPerReferenzaSection({
   confronto,
   cardState,
@@ -582,6 +612,8 @@ export function TopMatchPerReferenzaSection({
   isRemovingReferenza = false,
   addReferenzaError = null,
   removeReferenzaError = null,
+  prezzoTotale,
+  showPendingOptimization = false,
 }: {
   confronto: RisultatoConfronto;
   cardState: CardStateMap;
@@ -596,6 +628,8 @@ export function TopMatchPerReferenzaSection({
   isRemovingReferenza?: boolean;
   addReferenzaError?: string | null;
   removeReferenzaError?: string | null;
+  prezzoTotale: number;
+  showPendingOptimization?: boolean;
 }) {
   const rows = confronto.top_match_per_referenza;
   const ecommerceById = useMemo(
@@ -609,6 +643,7 @@ export function TopMatchPerReferenzaSection({
   const [collapsedRows, setCollapsedRows] = useState<Record<number, boolean>>({});
   const [addingAfterIndex, setAddingAfterIndex] = useState<number | null>(null);
   const [deleteArmedIndex, setDeleteArmedIndex] = useState<number | null>(null);
+  const [analisiOpen, setAnalisiOpen] = useState(false);
   const prevAddingReferenza = useRef(isAddingReferenza);
   const prevRemovingReferenza = useRef(isRemovingReferenza);
   const pendingScrollToAddRef = useRef<number | null>(null);
@@ -721,6 +756,110 @@ export function TopMatchPerReferenzaSection({
 
     return ecommerceOrderRef.current;
   }, [allEcommerceIds, shuffleSeed]);
+
+  const analisiSlides = useMemo<AnalisiReferenzaSlide[]>(
+    () =>
+      rowsWithCards.map(({ row, matchCards }) => ({
+        queryIndex: row.query_index,
+        queryText: row.query_text,
+        matchCount: matchCards.length,
+      })),
+    [rowsWithCards]
+  );
+
+  const introDemoData = useMemo<IntroDemoData | null>(() => {
+    const first = rowsWithCards[0];
+    if (!first) {
+      return null;
+    }
+
+    const orderedGroups = orderEcommerceGroups(
+      first.ecommerceGroups,
+      ecommerceOrder
+    );
+
+    const groups = orderedGroups
+      .map((group) => ({
+        ecommerceId: group.ecommerceId,
+        ecommerceName: group.col.ecommerce_name,
+        logoUrl: group.col.logo_url,
+        products: group.cards.map((card) => ({
+          id: card.candidato.id,
+          productName: card.candidato.product_name,
+          brand: card.candidato.brand ?? null,
+          price: card.candidato.prezzo,
+        })),
+      }))
+      .filter((group) => group.products.length > 0);
+
+    return {
+      queryText: first.row.query_text,
+      groups,
+    };
+  }, [rowsWithCards, ecommerceOrder]);
+
+  const rowsByQueryIndex = useMemo(
+    () => new Map(rowsWithCards.map((entry) => [entry.row.query_index, entry])),
+    [rowsWithCards]
+  );
+
+  const renderAnalisiSlideContent = useCallback(
+    (queryIndex: number) => {
+      const entry = rowsByQueryIndex.get(queryIndex);
+      if (!entry) {
+        return null;
+      }
+
+      const orderedGroups = orderEcommerceGroups(
+        entry.ecommerceGroups,
+        ecommerceOrder
+      );
+
+      return (
+        <ReferenzaMatchContent
+          orderedGroups={orderedGroups}
+          matchCards={entry.matchCards}
+          cardState={cardState}
+          onQuantityChange={(key, next) => {
+            if (onCardQuantityChange) {
+              onCardQuantityChange(key, next);
+              return;
+            }
+
+            const current = cardState[key] ?? {
+              hidden: false,
+              selected: false,
+              quantity: 1,
+            };
+            onCardStateChange({
+              ...cardState,
+              [key]: { ...current, quantity: next },
+            });
+          }}
+          onToggleSelected={onToggleSelected}
+          onAddAsReferenza={
+            onAddReferenza
+              ? (productName) => {
+                  onAddReferenza(queryIndex, productName);
+                  setDeleteArmedIndex(null);
+                }
+              : undefined
+          }
+          isAddingReferenza={isAddingReferenza}
+        />
+      );
+    },
+    [
+      rowsByQueryIndex,
+      ecommerceOrder,
+      cardState,
+      onCardQuantityChange,
+      onCardStateChange,
+      onToggleSelected,
+      onAddReferenza,
+      isAddingReferenza,
+    ]
+  );
 
   if (!rows || rows.length === 0) {
     return null;
@@ -842,10 +981,17 @@ export function TopMatchPerReferenzaSection({
   return (
     <section className="flex min-w-0 flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             Seleziona i prodotti migliori per ogni tua esigenza.
           </p>
+          <button
+            type="button"
+            onClick={() => setAnalisiOpen(true)}
+            className="inline-flex shrink-0 items-center rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-800 shadow-sm transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+          >
+            Analizza 1 per 1 🧐
+          </button>
         </div>
 
         <button
@@ -856,6 +1002,18 @@ export function TopMatchPerReferenzaSection({
           {allCollapsed ? "apri tutte" : "chiudi tutte"}
         </button>
       </div>
+
+      {introDemoData ? (
+        <AnalisiUnoPerUnoDialog
+          open={analisiOpen}
+          onOpenChange={setAnalisiOpen}
+          slides={analisiSlides}
+          renderSlideContent={renderAnalisiSlideContent}
+          introDemo={introDemoData}
+          prezzoTotale={prezzoTotale}
+          showPendingOptimization={showPendingOptimization}
+        />
+      ) : null}
 
       {removeReferenzaError ? (
         <p className="text-sm text-red-600 dark:text-red-400">{removeReferenzaError}</p>
@@ -930,35 +1088,24 @@ export function TopMatchPerReferenzaSection({
                 </div>
 
                 {!isCollapsed ? (
-                  matchCards.length > 0 ? (
-                    <div className="flex flex-col gap-5">
-                      {orderedGroups.map((group) => (
-                        <EcommerceMatchStrip
-                          key={group.ecommerceId}
-                          group={group}
-                          visibleCards={group.cards}
-                          cardState={cardState}
-                          onQuantityChange={(key, next) =>
-                            updateCardState(key, { quantity: next })
+                  <ReferenzaMatchContent
+                    orderedGroups={orderedGroups}
+                    matchCards={matchCards}
+                    cardState={cardState}
+                    onQuantityChange={(key, next) =>
+                      updateCardState(key, { quantity: next })
+                    }
+                    onToggleSelected={onToggleSelected}
+                    onAddAsReferenza={
+                      onAddReferenza
+                        ? (productName) => {
+                            onAddReferenza(row.query_index, productName);
+                            setDeleteArmedIndex(null);
                           }
-                          onToggleSelected={onToggleSelected}
-                          onAddAsReferenza={
-                            onAddReferenza
-                              ? (productName) => {
-                                  onAddReferenza(row.query_index, productName);
-                                  setDeleteArmedIndex(null);
-                                }
-                              : undefined
-                          }
-                          isAddingReferenza={isAddingReferenza}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-zinc-500">
-                      Nessun match trovato per questa referenza.
-                    </p>
-                  )
+                        : undefined
+                    }
+                    isAddingReferenza={isAddingReferenza}
+                  />
                 ) : null}
               </article>
 

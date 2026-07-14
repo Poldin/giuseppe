@@ -219,8 +219,8 @@ export function ChatConfrontoClient({
   );
 
   const pendingFingerprint = useMemo(
-    () => buildPendingFingerprint(pending.changes, pending.savingsDelta),
-    [pending.changes, pending.savingsDelta]
+    () => buildPendingFingerprint(pending.changes, pending.summary.savingsDelta),
+    [pending.changes, pending.summary.savingsDelta]
   );
 
   const showPendingOptimization =
@@ -609,7 +609,7 @@ export function ChatConfrontoClient({
             isAddingReferenza={isAddingReferenza}
             showPendingOptimization={showPendingOptimization}
             pendingChanges={pending.changes}
-            savingsDelta={pending.savingsDelta}
+            pendingSummary={pending.summary}
             onAcceptPending={handleAcceptPending}
             onRejectPending={handleRejectPending}
           />
@@ -642,6 +642,8 @@ export function ChatConfrontoClient({
         }}
         isRemovingReferenza={isRemovingReferenza}
         removeReferenzaError={removeReferenzaError}
+        prezzoTotale={committedScenario.prezzo_totale}
+        showPendingOptimization={showPendingOptimization}
       />
 
       <ConfrontoEcommerceTable

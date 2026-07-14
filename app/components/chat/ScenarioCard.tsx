@@ -5,12 +5,15 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUpRight, Loader2, Plus, Trash2, X } from "lucide-react";
 
 import { QuantityControl } from "@/app/components/chat/QuantityControl";
+import { EcommerceLogoBadge } from "@/app/components/chat/EcommerceLogoBadge";
 import {
   buildShippingHints,
   calcolaSpedizione,
   type ShippingTier,
 } from "@/app/lib/search/shipping-cost";
 import type {
+  PendingOptimizationSummary,
+  PendingRowAssignment,
   PendingRowChange,
   ScenarioCarrello,
   TabellaEcommerce,
@@ -152,16 +155,109 @@ function formatScenarioSummary(
   return `${copertura}/${coperturaTotale} referenze · prodotti ${formatPrice(prezzoProdotti)}${spedizioneLabel}`;
 }
 
+function formatPendingSavingsLabel(savingsDelta: number): string {
+  if (savingsDelta > 0.009) {
+    return `Risparmi ${formatPrice(savingsDelta)}`;
+  }
+
+  if (savingsDelta < -0.009) {
+    return `Variazione ${formatPrice(Math.abs(savingsDelta))}`;
+  }
+
+  return "Configurazione alternativa";
+}
+
+function formatAssignmentPriceLine(assignment: PendingRowAssignment): string {
+  if (assignment.quantita > 1) {
+    return `${assignment.quantita} × ${formatPrice(assignment.prezzoUnitario)} = ${formatPrice(assignment.prezzoRiga)}`;
+  }
+
+  return formatPrice(assignment.prezzoRiga);
+}
+
+function describeRowChange(change: PendingRowChange): string {
+  if (!change.committed) {
+    return "Nuova referenza da aggiungere alla tabella ottimizzata.";
+  }
+
+  if (change.committed.ecommerceId !== change.optimal.ecommerceId) {
+    return "Cambio negozio consigliato per ridurre il costo complessivo (prodotto + spedizione).";
+  }
+
+  if (change.committed.productName !== change.optimal.productName) {
+    return "Stesso negozio, prodotto alternativo più conveniente.";
+  }
+
+  if (change.committed.quantita !== change.optimal.quantita) {
+    return "Stesso prodotto e negozio, quantità diversa nell'ottimo.";
+  }
+
+  return "Aggiornamento consigliato su questa referenza.";
+}
+
+function PendingAssignmentBlock({
+  label,
+  assignment,
+  tone,
+}: {
+  label: string;
+  assignment: PendingRowAssignment | null;
+  tone: "current" | "optimal";
+}) {
+  const labelClass =
+    tone === "current"
+      ? "text-zinc-500 dark:text-zinc-400"
+      : "text-sky-700 dark:text-sky-300";
+
+  if (!assignment) {
+    return (
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className={`text-[11px] font-semibold uppercase tracking-wide ${labelClass}`}>
+            {label}
+          </p>
+        </div>
+        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+          Non presente in tabella
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-w-0">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className={`text-[11px] font-semibold uppercase tracking-wide ${labelClass}`}>
+          {label}
+        </p>
+        <EcommerceLogoBadge
+          logoUrl={assignment.ecommerceLogoUrl}
+          name={assignment.ecommerceName}
+        />
+      </div>
+      <p className="mt-1 text-sm font-semibold break-words text-zinc-900 dark:text-zinc-100">
+        {assignment.productName}
+      </p>
+      {assignment.brand ? (
+        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{assignment.brand}</p>
+      ) : null}
+      <p className="mt-1 text-xs tabular-nums text-zinc-700 dark:text-zinc-200">
+        {formatAssignmentPriceLine(assignment)}
+      </p>
+    </div>
+  );
+}
+
 function PendingOptimizationDetailsDialog({
   open,
   onOpenChange,
   changes,
-  savingsLabel,
+  summary,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   changes: PendingRowChange[];
-  savingsLabel: string;
+  summary: PendingOptimizationSummary;
 }) {
   const handleClose = useCallback(() => {
     onOpenChange(false);
@@ -188,6 +284,13 @@ function PendingOptimizationDetailsDialog({
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [open, handleClose]);
+
+  const savingsLabel = formatPendingSavingsLabel(summary.savingsDelta);
+
+  const prodottiDelta =
+    summary.committed.prezzoProdotti - summary.optimal.prezzoProdotti;
+  const spedizioneDelta =
+    summary.committed.prezzoSpedizione - summary.optimal.prezzoSpedizione;
 
   return (
     <AnimatePresence>
@@ -219,11 +322,8 @@ function PendingOptimizationDetailsDialog({
                   id="pending-optimization-dialog-title"
                   className="text-sm font-semibold text-sky-950 dark:text-sky-100"
                 >
-                  <span aria-hidden="true">⚡</span> Dettagli ottimizzazione
+                  <span aria-hidden="true">⚡</span> {savingsLabel}
                 </h4>
-                <p className="mt-0.5 text-xs text-sky-800 dark:text-sky-200/80">
-                  {savingsLabel}
-                </p>
               </div>
               <button
                 type="button"
@@ -236,19 +336,77 @@ function PendingOptimizationDetailsDialog({
             </header>
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 sm:px-5 sm:py-4">
-              <ul className="space-y-2">
+              <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl bg-zinc-50 px-3 py-3 dark:bg-zinc-900/50">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Tabella attuale
+                  </p>
+                  <p className="mt-1 text-lg font-bold tabular-nums text-zinc-900 dark:text-zinc-100">
+                    {formatPrice(summary.committed.prezzoTotale)}
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+                    prodotti {formatPrice(summary.committed.prezzoProdotti)} · spedizione{" "}
+                    {formatPrice(summary.committed.prezzoSpedizione)}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-sky-50 px-3 py-3 dark:bg-sky-950/30">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+                    Tabella proposta
+                  </p>
+                  <p className="mt-1 text-lg font-bold tabular-nums text-sky-950 dark:text-sky-100">
+                    {formatPrice(summary.optimal.prezzoTotale)}
+                  </p>
+                  <p className="mt-1 text-xs text-sky-800 dark:text-sky-200/80">
+                    prodotti {formatPrice(summary.optimal.prezzoProdotti)} · spedizione{" "}
+                    {formatPrice(summary.optimal.prezzoSpedizione)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mb-4 rounded-xl bg-sky-50/70 px-3 py-2.5 text-xs text-sky-900 dark:bg-sky-950/20 dark:text-sky-100">
+                <p>
+                  {changes.length === 1
+                    ? "1 referenza cambierebbe assegnazione."
+                    : `${changes.length} referenze cambierebbero assegnazione.`}
+                  {Math.abs(prodottiDelta) > 0.009 ? (
+                    <>
+                      {" "}
+                      Prodotti:{" "}
+                      {prodottiDelta > 0 ? "−" : "+"}
+                      {formatPrice(Math.abs(prodottiDelta))}.
+                    </>
+                  ) : null}
+                  {Math.abs(spedizioneDelta) > 0.009 ? (
+                    <>
+                      {" "}
+                      Spedizione:{" "}
+                      {spedizioneDelta > 0 ? "−" : "+"}
+                      {formatPrice(Math.abs(spedizioneDelta))}.
+                    </>
+                  ) : null}
+                </p>
+              </div>
+
+              <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
                 {changes.map((change) => (
-                  <li
-                    key={change.queryIndex}
-                    className="rounded-lg border border-sky-200/80 bg-sky-50/50 px-3 py-2.5 dark:border-sky-800/60 dark:bg-sky-950/20"
-                  >
-                    <div className="min-w-0 text-xs text-sky-950 dark:text-sky-100">
-                      <p className="font-semibold break-words">{change.queryText}</p>
-                      <p className="mt-0.5 text-sky-800 dark:text-sky-200/80">
-                        {change.committed
-                          ? `${change.committed.ecommerceName} → ${change.optimal.ecommerceName}`
-                          : `Aggiungi su ${change.optimal.ecommerceName}`}
-                      </p>
+                  <li key={change.queryIndex} className="py-4 first:pt-0 last:pb-0">
+                    <p className="text-sm font-bold break-words text-zinc-900 dark:text-zinc-100">
+                      {change.queryText}
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      {describeRowChange(change)}
+                    </p>
+                    <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                      <PendingAssignmentBlock
+                        label="Attuale"
+                        assignment={change.committed}
+                        tone="current"
+                      />
+                      <PendingAssignmentBlock
+                        label="Proposta"
+                        assignment={change.optimal}
+                        tone="optimal"
+                      />
                     </div>
                   </li>
                 ))}
@@ -263,12 +421,12 @@ function PendingOptimizationDetailsDialog({
 
 function PendingOptimizationBanner({
   changes,
-  savingsDelta,
+  summary,
   onAccept,
   onReject,
 }: {
   changes: PendingRowChange[];
-  savingsDelta: number;
+  summary: PendingOptimizationSummary;
   onAccept: () => void;
   onReject: () => void;
 }) {
@@ -284,12 +442,7 @@ function PendingOptimizationBanner({
     return null;
   }
 
-  const savingsLabel =
-    savingsDelta > 0.009
-      ? `Risparmi ${formatPrice(savingsDelta)}`
-      : savingsDelta < -0.009
-        ? `Variazione ${formatPrice(Math.abs(savingsDelta))}`
-        : "Configurazione alternativa";
+  const savingsLabel = formatPendingSavingsLabel(summary.savingsDelta);
 
   const handleAccept = () => {
     setDetailsOpen(false);
@@ -303,16 +456,11 @@ function PendingOptimizationBanner({
 
   return (
     <>
-      <div className="border-b border-sky-300/50 bg-sky-50 px-4 py-3 sm:px-5 dark:border-sky-700/50 dark:bg-sky-950/30">
+      <div className="bg-sky-50 px-4 py-3 sm:px-5 dark:bg-sky-950/30">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex gap-2">
             <p className="text-sm font-semibold text-sky-950 dark:text-sky-100">
               <span aria-hidden="true">⚡</span> {savingsLabel}
-            </p>
-            <p className="mt-0.5 text-xs text-sky-800 dark:text-sky-200/80">
-              {changes.length === 1
-                ? "1 referenza può essere ottimizzata"
-                : `${changes.length} referenze possono essere ottimizzate`}
             </p>
             <button
               type="button"
@@ -346,7 +494,7 @@ function PendingOptimizationBanner({
         open={detailsOpen}
         onOpenChange={setDetailsOpen}
         changes={changes}
-        savingsLabel={savingsLabel}
+        summary={summary}
       />
     </>
   );
@@ -366,7 +514,7 @@ export function ScenarioCard({
   isAddingReferenza = false,
   showPendingOptimization = false,
   pendingChanges = [],
-  savingsDelta = 0,
+  pendingSummary,
   onAcceptPending,
   onRejectPending,
 }: {
@@ -388,7 +536,7 @@ export function ScenarioCard({
   isAddingReferenza?: boolean;
   showPendingOptimization?: boolean;
   pendingChanges?: PendingRowChange[];
-  savingsDelta?: number;
+  pendingSummary?: PendingOptimizationSummary;
   onAcceptPending?: () => void;
   onRejectPending?: () => void;
 }) {
@@ -443,10 +591,10 @@ export function ScenarioCard({
         </p>
       </header>
 
-      {showPendingOptimization && onAcceptPending && onRejectPending ? (
+      {showPendingOptimization && pendingSummary && onAcceptPending && onRejectPending ? (
         <PendingOptimizationBanner
           changes={pendingChanges}
-          savingsDelta={savingsDelta}
+          summary={pendingSummary}
           onAccept={onAcceptPending}
           onReject={onRejectPending}
         />
@@ -472,20 +620,10 @@ export function ScenarioCard({
           return (
             <div key={ecomId} className="mb-4 last:mb-0">
               <div className="mb-1 flex items-start justify-between gap-3">
-                <div className="inline-flex h-6 max-w-full items-center rounded-md bg-white px-2 py-0.5 ring-1 ring-zinc-100 dark:ring-zinc-800">
-                  {ecom?.logo_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={ecom.logo_url}
-                      alt={ecom.ecommerce_name}
-                      className="h-full w-auto max-w-28 object-contain object-left"
-                    />
-                  ) : (
-                    <span className="text-xs font-bold uppercase text-zinc-600">
-                      {(ecom?.ecommerce_name ?? ecomId).slice(0, 2)}
-                    </span>
-                  )}
-                </div>
+                <EcommerceLogoBadge
+                  logoUrl={ecom?.logo_url}
+                  name={ecom?.ecommerce_name ?? ecomId}
+                />
                 <p className="shrink-0 text-lg font-bold tabular-nums tracking-tight">
                   {formatPrice(totaleParziale)}
                 </p>

@@ -1,6 +1,8 @@
 import type {
   CommittedAssignment,
   EcommerceInfo,
+  PendingOptimizationSummary,
+  PendingRowAssignment,
   PendingRowChange,
   ScenarioCarrello,
   SelezioneUtente,
@@ -203,14 +205,16 @@ export function buildScenarioFromAssignments(
   };
 }
 
-function lookupEcommerceName(
+function lookupEcommerceInfo(
   ecommerceId: string,
   catalogoEcommerce: EcommerceInfo[]
-): string {
-  return (
-    catalogoEcommerce.find((entry) => entry.id === ecommerceId)?.name ??
-    ecommerceId
-  );
+): { name: string; logoUrl: string | null } {
+  const entry = catalogoEcommerce.find((item) => item.id === ecommerceId);
+
+  return {
+    name: entry?.name ?? ecommerceId,
+    logoUrl: entry?.logo_url ?? null,
+  };
 }
 
 function assignmentMapFromScenario(
@@ -257,6 +261,32 @@ function assignmentsEqual(
   );
 }
 
+function buildPendingRowAssignment(input: {
+  ecommerceId: string;
+  ecommerceName: string;
+  ecommerceLogoUrl: string | null;
+  voce: {
+    offerta: {
+      product_name: string;
+      prezzo: number;
+      brand?: string | null;
+    };
+    quantita: number;
+    prezzo_riga: number;
+  };
+}): PendingRowAssignment {
+  return {
+    ecommerceId: input.ecommerceId,
+    ecommerceName: input.ecommerceName,
+    ecommerceLogoUrl: input.ecommerceLogoUrl,
+    productName: input.voce.offerta.product_name,
+    quantita: input.voce.quantita,
+    prezzoUnitario: input.voce.offerta.prezzo,
+    prezzoRiga: input.voce.prezzo_riga,
+    brand: input.voce.offerta.brand,
+  };
+}
+
 export function computePendingChanges(input: {
   committedAssignments: CommittedAssignment[];
   committedScenario: ScenarioCarrello;
@@ -264,7 +294,7 @@ export function computePendingChanges(input: {
   prodottiRichiesti: string[];
   catalogoEcommerce: EcommerceInfo[];
   queryIndexByOffertaId: Map<string, number>;
-}): { changes: PendingRowChange[]; savingsDelta: number } {
+}): { changes: PendingRowChange[]; summary: PendingOptimizationSummary } {
   const committedMap = new Map(
     input.committedAssignments.map((assignment) => [
       assignment.query_index,
@@ -302,39 +332,60 @@ export function computePendingChanges(input: {
       continue;
     }
 
+    const committedVoce = committedDisplay
+      ? input.committedScenario.ordini[committedDisplay.ecommerce_id]?.find(
+          (voce) => voce.offerta.id === committedDisplay.offerta_id
+        ) ?? null
+      : null;
+
+    const committedEcommerce = committedDisplay
+      ? lookupEcommerceInfo(committedDisplay.ecommerce_id, input.catalogoEcommerce)
+      : null;
+    const optimalEcommerce = lookupEcommerceInfo(
+      optimalAssignment.ecommerce_id,
+      input.catalogoEcommerce
+    );
+
     changes.push({
       queryIndex,
       queryText: input.prodottiRichiesti[queryIndex] ?? `Referenza ${queryIndex + 1}`,
-      committed: committedDisplay
-        ? {
-            ecommerceId: committedDisplay.ecommerce_id,
-            ecommerceName: lookupEcommerceName(
-              committedDisplay.ecommerce_id,
-              input.catalogoEcommerce
-            ),
-            productName:
-              input.committedScenario.ordini[committedDisplay.ecommerce_id]?.find(
-                (voce) => voce.offerta.id === committedDisplay.offerta_id
-              )?.offerta.product_name ?? "—",
-            quantita: committedDisplay.quantita,
-          }
-        : null,
-      optimal: {
+      committed:
+        committedDisplay && committedVoce && committedEcommerce
+          ? buildPendingRowAssignment({
+              ecommerceId: committedDisplay.ecommerce_id,
+              ecommerceName: committedEcommerce.name,
+              ecommerceLogoUrl: committedEcommerce.logoUrl,
+              voce: committedVoce,
+            })
+          : null,
+      optimal: buildPendingRowAssignment({
         ecommerceId: optimalAssignment.ecommerce_id,
-        ecommerceName: lookupEcommerceName(
-          optimalAssignment.ecommerce_id,
-          input.catalogoEcommerce
-        ),
-        productName: optimalVoce.offerta.product_name,
-        quantita: optimalAssignment.quantita,
-      },
+        ecommerceName: optimalEcommerce.name,
+        ecommerceLogoUrl: optimalEcommerce.logoUrl,
+        voce: optimalVoce,
+      }),
     });
   }
 
   const savingsDelta =
     input.committedScenario.prezzo_totale - input.optimalScenario.prezzo_totale;
 
-  return { changes, savingsDelta };
+  return {
+    changes,
+    summary: {
+      savingsDelta,
+      committed: {
+        prezzoProdotti: input.committedScenario.prezzo_prodotti,
+        prezzoSpedizione: input.committedScenario.prezzo_spedizione,
+        prezzoTotale: input.committedScenario.prezzo_totale,
+      },
+      optimal: {
+        prezzoProdotti: input.optimalScenario.prezzo_prodotti,
+        prezzoSpedizione: input.optimalScenario.prezzo_spedizione,
+        prezzoTotale: input.optimalScenario.prezzo_totale,
+      },
+    },
+  };
 }
 
 export function updateCommittedQuantity(
