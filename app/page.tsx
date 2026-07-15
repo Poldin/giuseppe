@@ -32,11 +32,12 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans">
-      <main className="mx-auto max-w-lg px-6 py-2">
+      <main className="mx-auto max-w-lg px-2 py-2">
         {/* Hero */}
         <section className="flex flex-col gap-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <HowItWorksButton className="shrink-0 self-end sm:order-2" />
+            <div className="flex items-center gap-4 sm:order-1">
               <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-zinc-100 shadow-xl ring-4 ring-zinc-900/5 dark:bg-zinc-900 dark:ring-zinc-100/10 sm:h-24 sm:w-24">
                 <Image
                   src="/giuseppe.jpeg"
@@ -55,7 +56,6 @@ export default async function Home() {
                 </h1>
               </div>
             </div>
-            <HowItWorksButton className="shrink-0" />
           </div>
 
           <p className="text-base leading-relaxed text-zinc-600 dark:text-zinc-400 sm:text-lg">
