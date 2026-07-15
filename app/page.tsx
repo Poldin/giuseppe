@@ -35,10 +35,10 @@ export default async function Home() {
       <main className="mx-auto max-w-lg px-2 py-2">
         {/* Hero */}
         <section className="flex flex-col gap-3">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-            <HowItWorksButton className="shrink-0 self-end sm:order-2" />
-            <div className="flex items-center gap-4 sm:order-1">
-              <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-zinc-100 shadow-xl ring-4 ring-zinc-900/5 dark:bg-zinc-900 dark:ring-zinc-100/10 sm:h-24 sm:w-24">
+          <div className="flex flex-col gap-2">
+            <HowItWorksButton className="shrink-0 self-end" />
+            <div className="flex items-end gap-4">
+              <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-900 sm:h-24 sm:w-24">
                 <Image
                   src="/giuseppe.jpeg"
                   alt="Giuseppe"
@@ -47,19 +47,21 @@ export default async function Home() {
                   priority
                 />
               </div>
-              <div className="flex flex-col gap-1">
+              <div className="flex translate-y-0.5 flex-col gap-1">
                 <p className="text-lg text-zinc-600 dark:text-zinc-400 sm:text-xl">
                   Ciao👋 io sono
                 </p>
-                <h1 className="text-4xl font-black uppercase tracking-tighter sm:text-5xl">
+                <h1 className="text-4xl font-black uppercase leading-none tracking-tighter sm:text-5xl">
                   Giuseppe
                 </h1>
               </div>
             </div>
           </div>
 
-          <p className="text-base leading-relaxed text-zinc-600 dark:text-zinc-400 sm:text-lg">
-            confronto prezzi e prodotti <span className="font-extrabold">su +100K articoli</span> disponibili
+          <p className="text-base leading-relaxed text-zinc-900 sm:text-lg">
+            <span className="box-decoration-clone bg-white px-1 py-0.5 dark:bg-white dark:text-zinc-900">
+              confronto prezzi e prodotti <span className="font-extrabold">su +100K articoli</span> disponibili
+            </span>
           </p>
           <div className="mt-10">
             <HomeSearchBox />
