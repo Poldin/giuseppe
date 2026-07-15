@@ -37,7 +37,7 @@ type ChatSponsoredBannerProps = {
 };
 
 export function ChatSponsoredBanner({
-  title = "Rendi il tuo Studio visibile ai pazienti",
+  title = "Sei visibile ai nuovi pazienti? 🤔",
   description = "Con MioDottore usi AI e tecnologia per diventare il riferimento agli occhi dei pazienti. Così sanno da chi andare.",
   ctaLabel = "Prenota una call",
   ctaHref = "https://calendar.app.google/AoUmwjfPVyJPuGEaA",
@@ -60,7 +60,7 @@ export function ChatSponsoredBanner({
   }, [visible]);
 
   useEffect(() => {
-    let showTimer: ReturnType<typeof setTimeout> | null = null;
+    let showTimer: number | null = null;
 
     const clearShowTimer = () => {
       if (showTimer) {
