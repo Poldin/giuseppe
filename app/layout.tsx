@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Giuseppe",
-  description: "confronto prezzi e prodotti per gli studi dentistici",
+  description: "confronto prezzi e prodotti per studi dentistici",
 };
 
 export default function RootLayout({
