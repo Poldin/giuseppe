@@ -11,8 +11,8 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import create_client, Client
 
-from scrape_session import prompt_session_id
-from scrape_pages import prompt_page_plan, prompt_total_pages, resolve_pages
+from scrape_session import prompt_run_mode, prompt_session_id
+from scrape_pages import PagePlan, prompt_page_plan, prompt_total_pages, resolve_pages
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 load_dotenv(ROOT_DIR / ".env.local")
@@ -343,7 +343,13 @@ def parse_and_save(
     return 0
 
 
-def run_route(route_key: str) -> None:
+def run_route(
+    route_key: str,
+    *,
+    session_id: str | None = None,
+    page_plan: PagePlan | None = None,
+    total_pages: int | None = None,
+) -> None:
     route = ROUTES[route_key]
     label = route["label"]
     base_url = route["base_url"]
@@ -352,9 +358,10 @@ def run_route(route_key: str) -> None:
     print(f"=== Configurazione rotta {label} ===")
     print(f"URL base: {base_url}")
 
-    page_plan = prompt_page_plan()
-    total_pages: int | None = None
-    if page_plan.mode == "range":
+    if page_plan is None:
+        page_plan = prompt_page_plan()
+
+    if page_plan.mode == "range" and total_pages is None:
         total_pages = prompt_total_pages(base_url)
 
     try:
@@ -363,7 +370,8 @@ def run_route(route_key: str) -> None:
         log(f"[{label}] Configurazione pagine non valida: {exc}")
         sys.exit(1)
 
-    session_id = prompt_session_id(supabase, ECOMMERCE_ID, f"Gerhò {label}")
+    if session_id is None:
+        session_id = prompt_session_id(supabase, ECOMMERCE_ID, f"Gerhò {label}")
 
     if page_plan.mode == "list":
         log(f"[{label}] Pagine specifiche: {pages_to_scrape}")
@@ -424,24 +432,40 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print()
-    print("Quali rotte Gerhò vuoi eseguire?")
-    run_studio = prompt_yes_no("Eseguire la rotta STUDIO?")
-    run_laboratorio = prompt_yes_no("Eseguire la rotta LABORATORIO?")
+    mode = prompt_run_mode()
 
-    selected_routes: list[str] = []
-    if run_studio:
-        selected_routes.append("studio")
-    if run_laboratorio:
-        selected_routes.append("laboratorio")
+    if mode == "direct":
+        selected_routes = list(ROUTES.keys())
+        log(f"Modalità diretta: rotte {', '.join(ROUTES[key]['label'] for key in selected_routes)}")
+        session_id = prompt_session_id(supabase, ECOMMERCE_ID, "Gerhò")
+        page_plan = prompt_page_plan()
+    else:
+        print()
+        print("Quali rotte Gerhò vuoi eseguire?")
+        run_studio = prompt_yes_no("Eseguire la rotta STUDIO?")
+        run_laboratorio = prompt_yes_no("Eseguire la rotta LABORATORIO?")
 
-    if not selected_routes:
-        log("Nessuna rotta selezionata, esco.")
-        sys.exit(0)
+        selected_routes = []
+        if run_studio:
+            selected_routes.append("studio")
+        if run_laboratorio:
+            selected_routes.append("laboratorio")
+
+        if not selected_routes:
+            log("Nessuna rotta selezionata, esco.")
+            sys.exit(0)
+
+        session_id = None
+        page_plan = None
 
     for index, route_key in enumerate(selected_routes, start=1):
         if index > 1:
             print()
             print(f"--- Prossima rotta: {ROUTES[route_key]['label']} ---")
-        run_route(route_key)
+        run_route(
+            route_key,
+            session_id=session_id,
+            page_plan=page_plan,
+        )
 
     log("=== Scraping Gerhò completato ===")

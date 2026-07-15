@@ -1,6 +1,9 @@
 from datetime import datetime, timezone
+from typing import Literal
 
 from supabase import Client
+
+RunMode = Literal["interactive", "direct"]
 
 
 def fetch_recent_sessions(
@@ -42,6 +45,21 @@ def fetch_recent_sessions(
 
 def default_session_id() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def prompt_run_mode() -> RunMode:
+    print()
+    print("Modalità di esecuzione:")
+    print('  Invio / "i" → interattiva (scegli rotte e session ID per ciascuna)')
+    print('  "d"       → diretta (tutte le rotte, stesso session ID all\'inizio)')
+
+    while True:
+        raw = input("> ").strip().lower()
+        if raw in ("", "i", "interattiva", "interactive"):
+            return "interactive"
+        if raw in ("d", "diretta", "direct"):
+            return "direct"
+        print('Inserisci "i" per interattiva o "d" per diretta.')
 
 
 def prompt_session_id(supabase: Client, ecommerce_id: str, label: str) -> str:

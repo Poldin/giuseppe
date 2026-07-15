@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import create_client, Client
 
-from scrape_session import prompt_session_id
+from scrape_session import prompt_run_mode, prompt_session_id
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 load_dotenv(ROOT_DIR / ".env.local")
@@ -448,7 +448,12 @@ def parse_and_save(
     return 0
 
 
-def run_route(route_key: str) -> None:
+def run_route(
+    route_key: str,
+    *,
+    session_id: str | None = None,
+    start_page: int | None = None,
+) -> None:
     route = ROUTES[route_key]
     label = route["label"]
     base_url = route["base_url"]
@@ -459,8 +464,11 @@ def run_route(route_key: str) -> None:
     print(f"URL base: {base_url}")
     print("Le pagine verranno scrapate in automatico finché non se ne trova una vuota.")
 
-    start_page = prompt_start_page()
-    session_id = prompt_session_id(supabase, ECOMMERCE_ID, f"Dontalia {label}")
+    if start_page is None:
+        start_page = prompt_start_page()
+
+    if session_id is None:
+        session_id = prompt_session_id(supabase, ECOMMERCE_ID, f"Dontalia {label}")
 
     log(f"[{label}] Partenza da pagina {start_page}")
     log(f"[{label}] Session ID: {session_id}")
@@ -520,30 +528,50 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print()
-    print("Quali rotte Dontalia vuoi eseguire?")
-    run_studio = prompt_yes_no("Eseguire la rotta STUDIO?")
-    run_laboratorio = prompt_yes_no("Eseguire la rotta LABORATORIO?")
-    run_apparecchiatura = prompt_yes_no("Eseguire la rotta APPARECCHIATURA?")
-    run_ortodonzia = prompt_yes_no("Eseguire la rotta ORTODONZIA?")
+    mode = prompt_run_mode()
 
-    selected_routes: list[str] = []
-    if run_studio:
-        selected_routes.append("studio")
-    if run_laboratorio:
-        selected_routes.append("laboratorio")
-    if run_apparecchiatura:
-        selected_routes.append("apparecchiatura")
-    if run_ortodonzia:
-        selected_routes.append("ortodonzia")
+    if mode == "direct":
+        selected_routes = list(ROUTES.keys())
+        log(
+            "Modalità diretta: rotte "
+            f"{', '.join(ROUTES[key]['label'] for key in selected_routes)}"
+        )
+        session_id = prompt_session_id(supabase, ECOMMERCE_ID, "Dontalia")
+        start_page = 1
+        log("Modalità diretta: partenza da pagina 1 per tutte le rotte")
+    else:
+        print()
+        print("Quali rotte Dontalia vuoi eseguire?")
+        run_studio = prompt_yes_no("Eseguire la rotta STUDIO?")
+        run_laboratorio = prompt_yes_no("Eseguire la rotta LABORATORIO?")
+        run_apparecchiatura = prompt_yes_no("Eseguire la rotta APPARECCHIATURA?")
+        run_ortodonzia = prompt_yes_no("Eseguire la rotta ORTODONZIA?")
 
-    if not selected_routes:
-        log("Nessuna rotta selezionata, esco.")
-        sys.exit(0)
+        selected_routes = []
+        if run_studio:
+            selected_routes.append("studio")
+        if run_laboratorio:
+            selected_routes.append("laboratorio")
+        if run_apparecchiatura:
+            selected_routes.append("apparecchiatura")
+        if run_ortodonzia:
+            selected_routes.append("ortodonzia")
+
+        if not selected_routes:
+            log("Nessuna rotta selezionata, esco.")
+            sys.exit(0)
+
+        session_id = None
+        start_page = None
 
     for index, route_key in enumerate(selected_routes, start=1):
         if index > 1:
             print()
             print(f"--- Prossima rotta: {ROUTES[route_key]['label']} ---")
-        run_route(route_key)
+        run_route(
+            route_key,
+            session_id=session_id,
+            start_page=start_page,
+        )
 
     log("=== Scraping Dontalia completato ===")
