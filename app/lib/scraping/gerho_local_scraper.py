@@ -32,14 +32,36 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     )
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-STUDIO_BASE_URL = "https://www.gerho.it/STUDIO/"
-STUDIO_ORDER = "manufacturer-sort"
+
+CATALOG_ORDER = "manufacturer-sort"
+
+ROUTES: dict[str, dict[str, str]] = {
+    "studio": {
+        "label": "STUDIO",
+        "base_url": "https://www.gerho.it/STUDIO/",
+    },
+    "laboratorio": {
+        "label": "LABORATORIO",
+        "base_url": "https://www.gerho.it/LABORATORIO/",
+    },
+}
 
 
-def build_studio_url(page_number: int) -> str:
+def build_catalog_url(base_url: str, page_number: int) -> str:
     if page_number <= 1:
-        return STUDIO_BASE_URL
-    return f"{STUDIO_BASE_URL}?order={STUDIO_ORDER}&p={page_number}"
+        return base_url
+    return f"{base_url}?order={CATALOG_ORDER}&p={page_number}"
+
+
+def prompt_yes_no(message: str, *, default: bool = True) -> bool:
+    hint = "Y/n" if default else "y/N"
+    while True:
+        raw = input(f"{message} [{hint}] ").strip().lower()
+        if raw in ("", "y", "yes", "s", "si", "sì"):
+            return True if raw != "" or default else False
+        if raw in ("n", "no"):
+            return False
+        print('Rispondi "y" (sì) o "n" (no).')
 
 
 def log(message: str) -> None:
@@ -182,12 +204,12 @@ def parse_price(price_str):
     except ValueError:
         return None
 
-def scrape_page(page_number):
-    url = build_studio_url(page_number)
-    log(f"Pagina {page_number}: avvio browser -> {url}")
+def scrape_page(page_number: int, route_label: str, base_url: str):
+    url = build_catalog_url(base_url, page_number)
+    log(f"[{route_label}] Pagina {page_number}: avvio browser -> {url}")
 
     with sync_playwright() as p:
-        log(f"Pagina {page_number}: lancio Chromium...")
+        log(f"[{route_label}] Pagina {page_number}: lancio Chromium...")
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (Chrome/120.0.0.0)",
@@ -196,9 +218,9 @@ def scrape_page(page_number):
         page = context.new_page()
 
         try:
-            log(f"Pagina {page_number}: navigazione in corso (timeout 60s)...")
+            log(f"[{route_label}] Pagina {page_number}: navigazione in corso (timeout 60s)...")
             page.goto(url, wait_until="domcontentloaded", timeout=60000)
-            log(f"Pagina {page_number}: pagina caricata, titolo: {page.title()!r}")
+            log(f"[{route_label}] Pagina {page_number}: pagina caricata, titolo: {page.title()!r}")
 
             dismiss_overlays(page, page_number)
             page.wait_for_selector(
@@ -207,20 +229,25 @@ def scrape_page(page_number):
             )
 
             html = page.content()
-            log(f"Pagina {page_number}: HTML scaricato ({len(html):,} caratteri)")
+            log(f"[{route_label}] Pagina {page_number}: HTML scaricato ({len(html):,} caratteri)")
         except Exception as e:
-            log(f"Pagina {page_number}: ERRORE scraping -> {type(e).__name__}: {e!s}")
+            log(f"[{route_label}] Pagina {page_number}: ERRORE scraping -> {type(e).__name__}: {e!s}")
             html = None
         finally:
             browser.close()
-            log(f"Pagina {page_number}: browser chiuso")
+            log(f"[{route_label}] Pagina {page_number}: browser chiuso")
 
     return html
 
 
-def parse_and_save(html_content, page_number, session_id: str) -> int | None:
+def parse_and_save(
+    html_content,
+    page_number: int,
+    session_id: str,
+    route_label: str,
+) -> int | None:
     if not html_content:
-        log(f"Pagina {page_number}: nessun HTML, salto salvataggio")
+        log(f"[{route_label}] Pagina {page_number}: nessun HTML, salto salvataggio")
         return None
 
     soup = BeautifulSoup(html_content, "html.parser")
@@ -228,12 +255,15 @@ def parse_and_save(html_content, page_number, session_id: str) -> int | None:
 
     if not product_items:
         log(
-            f"Pagina {page_number}: 0 prodotti trovati "
+            f"[{route_label}] Pagina {page_number}: 0 prodotti trovati "
             "(selettore .cms-element-product-listing .order-wrapper)"
         )
         return -1
 
-    log(f"Pagina {page_number}: trovati {len(product_items)} prodotti nella tabella STUDIO")
+    log(
+        f"[{route_label}] Pagina {page_number}: "
+        f"trovati {len(product_items)} prodotti nella tabella"
+    )
 
     batch_data = []
     skipped = 0
@@ -271,6 +301,7 @@ def parse_and_save(html_content, page_number, session_id: str) -> int | None:
                 "other": {
                     "original_url": product_url,
                     "source_page": page_number,
+                    "source_section": route_label,
                     "old_price_list": old_price,
                 },
             }
@@ -278,35 +309,102 @@ def parse_and_save(html_content, page_number, session_id: str) -> int | None:
 
         except Exception as e:
             skipped += 1
-            log(f"Pagina {page_number}: errore parsing singolo prodotto -> {type(e).__name__}: {e}")
+            log(
+                f"[{route_label}] Pagina {page_number}: "
+                f"errore parsing singolo prodotto -> {type(e).__name__}: {e}"
+            )
             continue
 
     log(
-        f"Pagina {page_number}: {len(batch_data)} prodotti validi, "
+        f"[{route_label}] Pagina {page_number}: {len(batch_data)} prodotti validi, "
         f"{skipped} scartati, {duplicate_ids} duplicati sku"
     )
 
     if batch_data:
         try:
-            log(f"Pagina {page_number}: upsert su Supabase ({len(batch_data)} record)...")
+            log(
+                f"[{route_label}] Pagina {page_number}: "
+                f"upsert su Supabase ({len(batch_data)} record)..."
+            )
             response = supabase.table("scraped_product").upsert(
                 batch_data,
                 on_conflict="ecommerce_id,id_ecommerce"
             ).execute()
             saved = len(response.data) if response.data else len(batch_data)
-            log(f"Pagina {page_number}: upsert OK ({saved} record)")
+            log(f"[{route_label}] Pagina {page_number}: upsert OK ({saved} record)")
         except Exception as e:
-            log(f"Pagina {page_number}: ERRORE database -> {type(e).__name__}: {e}")
+            log(
+                f"[{route_label}] Pagina {page_number}: "
+                f"ERRORE database -> {type(e).__name__}: {e}"
+            )
     else:
-        log(f"Pagina {page_number}: nessun record da salvare")
+        log(f"[{route_label}] Pagina {page_number}: nessun record da salvare")
 
     return 0
 
+
+def run_route(route_key: str) -> None:
+    route = ROUTES[route_key]
+    label = route["label"]
+    base_url = route["base_url"]
+
+    print()
+    print(f"=== Configurazione rotta {label} ===")
+    print(f"URL base: {base_url}")
+
+    page_plan = prompt_page_plan()
+    total_pages: int | None = None
+    if page_plan.mode == "range":
+        total_pages = prompt_total_pages(base_url)
+
+    try:
+        pages_to_scrape = resolve_pages(page_plan, total_pages)
+    except ValueError as exc:
+        log(f"[{label}] Configurazione pagine non valida: {exc}")
+        sys.exit(1)
+
+    session_id = prompt_session_id(supabase, ECOMMERCE_ID, f"Gerhò {label}")
+
+    if page_plan.mode == "list":
+        log(f"[{label}] Pagine specifiche: {pages_to_scrape}")
+    else:
+        log(
+            f"[{label}] Pagine {page_plan.start_page} → {total_pages} "
+            f"(totale {len(pages_to_scrape)})"
+        )
+    log(f"[{label}] Session ID: {session_id}")
+
+    for index, page in enumerate(pages_to_scrape, start=1):
+        if page > 1000:
+            log(f"[{label}] Limite sicurezza 1000 pagine raggiunto, stop")
+            break
+
+        if page_plan.mode == "list":
+            log(f"[{label}] --- Inizio pagina {page} ({index}/{len(pages_to_scrape)}) ---")
+        else:
+            log(f"[{label}] --- Inizio pagina {page}/{total_pages} ---")
+
+        html = scrape_page(page, label, base_url)
+        result = parse_and_save(html, page, session_id, label)
+
+        if result == -1:
+            log(f"[{label}] Pagina {page}: nessun prodotto, stop")
+            break
+
+        if index < len(pages_to_scrape):
+            pause = random.uniform(2.5, 5.0)
+            log(f"[{label}] Pagina {page}: pausa {pause:.1f}s prima della prossima")
+            time.sleep(pause)
+
+    log(f"=== Rotta {label} completata ===")
+
+
 if __name__ == "__main__":
-    log("=== Avvio gerho_local_scraper (sezione STUDIO) ===")
+    log("=== Avvio gerho_local_scraper ===")
     log(f"Supabase URL: {SUPABASE_URL}")
     log(f"Ecommerce ID: {ECOMMERCE_ID}")
-    log(f"Base URL: {STUDIO_BASE_URL}")
+    for route_key, route in ROUTES.items():
+        log(f"Rotta {route['label']}: {route['base_url']}")
 
     try:
         test = supabase.table("scraped_product").select("id").limit(1).execute()
@@ -317,7 +415,7 @@ if __name__ == "__main__":
 
     if not sys.stdin.isatty():
         print()
-        print("Questo script chiede input interattivo (pagine totali, pagina di partenza).")
+        print("Questo script chiede input interattivo (rotte, pagine, session ID).")
         print("Non puoi rispondere dalla scheda Output / Code Runner.")
         print()
         print("Apri il Terminale integrato (Ctrl+`) e lancia:")
@@ -325,48 +423,25 @@ if __name__ == "__main__":
         print()
         sys.exit(1)
 
-    page_plan = prompt_page_plan()
-    total_pages: int | None = None
-    if page_plan.mode == "range":
-        total_pages = prompt_total_pages(STUDIO_BASE_URL)
+    print()
+    print("Quali rotte Gerhò vuoi eseguire?")
+    run_studio = prompt_yes_no("Eseguire la rotta STUDIO?")
+    run_laboratorio = prompt_yes_no("Eseguire la rotta LABORATORIO?")
 
-    try:
-        pages_to_scrape = resolve_pages(page_plan, total_pages)
-    except ValueError as exc:
-        log(f"Configurazione pagine non valida: {exc}")
-        sys.exit(1)
+    selected_routes: list[str] = []
+    if run_studio:
+        selected_routes.append("studio")
+    if run_laboratorio:
+        selected_routes.append("laboratorio")
 
-    session_id = prompt_session_id(supabase, ECOMMERCE_ID, "Gerhò")
+    if not selected_routes:
+        log("Nessuna rotta selezionata, esco.")
+        sys.exit(0)
 
-    if page_plan.mode == "list":
-        log(f"Configurazione: pagine specifiche {pages_to_scrape}")
-    else:
-        log(
-            f"Configurazione: pagine {page_plan.start_page} → {total_pages} "
-            f"(totale {len(pages_to_scrape)})"
-        )
-    log(f"Session ID: {session_id}")
-
-    for index, page in enumerate(pages_to_scrape, start=1):
-        if page > 1000:
-            log("Limite sicurezza 1000 pagine raggiunto, stop")
-            break
-
-        if page_plan.mode == "list":
-            log(f"--- Inizio pagina {page} ({index}/{len(pages_to_scrape)}) ---")
-        else:
-            log(f"--- Inizio pagina {page}/{total_pages} ---")
-
-        html = scrape_page(page)
-        result = parse_and_save(html, page, session_id)
-
-        if result == -1:
-            log(f"Pagina {page}: nessun prodotto, stop")
-            break
-
-        if index < len(pages_to_scrape):
-            pause = random.uniform(2.5, 5.0)
-            log(f"Pagina {page}: pausa {pause:.1f}s prima della prossima")
-            time.sleep(pause)
+    for index, route_key in enumerate(selected_routes, start=1):
+        if index > 1:
+            print()
+            print(f"--- Prossima rotta: {ROUTES[route_key]['label']} ---")
+        run_route(route_key)
 
     log("=== Scraping Gerhò completato ===")

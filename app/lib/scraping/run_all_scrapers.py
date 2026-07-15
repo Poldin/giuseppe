@@ -26,7 +26,12 @@ SCRAPERS: list[dict[str, str]] = [
     {
         "name": "Gerhò",
         "script": "gerho_local_scraper.py",
-        "note": "Sezione STUDIO",
+        "note": "Rotte STUDIO e/o LABORATORIO",
+    },
+    {
+        "name": "Dontalia",
+        "script": "dontalia_local_scraper.py",
+        "note": "Studio, Laboratorio, Apparecchiatura, Ortodonzia",
     },
 ]
 
