@@ -438,10 +438,6 @@ function PendingOptimizationBanner({
     }
   }, [changes.length]);
 
-  if (changes.length === 0) {
-    return null;
-  }
-
   const savingsLabel = formatPendingSavingsLabel(summary.savingsDelta);
 
   const handleAccept = () => {
@@ -456,37 +452,35 @@ function PendingOptimizationBanner({
 
   return (
     <>
-      <div className="bg-sky-50 px-4 py-3 sm:px-5 dark:bg-sky-950/30">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex gap-2">
-            <p className="text-sm font-semibold text-sky-950 dark:text-sky-100">
-              <span aria-hidden="true">⚡</span> {savingsLabel}
-            </p>
-            <button
-              type="button"
-              onClick={() => setDetailsOpen((current) => !current)}
-              className="mt-1 text-xs font-medium text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
-              aria-expanded={detailsOpen}
-            >
-              {detailsOpen ? "chiudi dettagli" : "mostra dettagli"}
-            </button>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={handleReject}
-              className="rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-xs font-semibold text-sky-800 transition-colors hover:bg-sky-100 dark:border-sky-600 dark:bg-sky-950/40 dark:text-sky-100 dark:hover:bg-sky-900/50"
-            >
-              Rifiuta
-            </button>
-            <button
-              type="button"
-              onClick={handleAccept}
-              className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-sky-700"
-            >
-              Applica
-            </button>
-          </div>
+      <div className="flex h-full w-full items-center gap-2 px-4 sm:px-5">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <p className="truncate text-xs font-semibold text-sky-950 dark:text-sky-100">
+            <span aria-hidden="true">⚡</span> {savingsLabel}
+          </p>
+          <button
+            type="button"
+            onClick={() => setDetailsOpen((current) => !current)}
+            className="shrink-0 text-[11px] font-medium text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
+            aria-expanded={detailsOpen}
+          >
+            {detailsOpen ? "chiudi dettagli" : "mostra dettagli"}
+          </button>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            onClick={handleReject}
+            className="rounded-md border border-sky-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-sky-800 transition-colors hover:bg-sky-100 dark:border-sky-600 dark:bg-sky-950/40 dark:text-sky-100 dark:hover:bg-sky-900/50"
+          >
+            Rifiuta
+          </button>
+          <button
+            type="button"
+            onClick={handleAccept}
+            className="rounded-md bg-sky-600 px-2 py-0.5 text-[11px] font-semibold text-white transition-colors hover:bg-sky-700"
+          >
+            Applica
+          </button>
         </div>
       </div>
 
@@ -591,14 +585,29 @@ export function ScenarioCard({
         </p>
       </header>
 
-      {showPendingOptimization && pendingSummary && onAcceptPending && onRejectPending ? (
-        <PendingOptimizationBanner
-          changes={pendingChanges}
-          summary={pendingSummary}
-          onAccept={onAcceptPending}
-          onReject={onRejectPending}
-        />
-      ) : null}
+      <div
+        className={`flex h-9 shrink-0 items-center overflow-hidden ${
+          showPendingOptimization &&
+          pendingSummary &&
+          onAcceptPending &&
+          onRejectPending
+            ? "bg-sky-50 dark:bg-sky-950/30"
+            : ""
+        }`}
+        aria-live="polite"
+      >
+        {showPendingOptimization &&
+        pendingSummary &&
+        onAcceptPending &&
+        onRejectPending ? (
+          <PendingOptimizationBanner
+            changes={pendingChanges}
+            summary={pendingSummary}
+            onAccept={onAcceptPending}
+            onReject={onRejectPending}
+          />
+        ) : null}
+      </div>
 
       <div className="p-4 sm:p-5">
         {Object.entries(scenario.ordini).map(([ecomId, voci]) => {
