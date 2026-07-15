@@ -15,7 +15,11 @@ export function HowItWorksButton({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={className}>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={className ? `${buttonClassName} ${className}` : buttonClassName}
+      >
         Come funziona?
       </button>
       <HowItWorksDialog open={open} onOpenChange={setOpen} />

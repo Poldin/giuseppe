@@ -35,31 +35,33 @@ export default async function Home() {
       <main className="mx-auto max-w-lg px-6 py-2">
         {/* Hero */}
         <section className="flex flex-col gap-3">
-          <div className="flex items-center gap-4">
-            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-zinc-100 shadow-xl ring-4 ring-zinc-900/5 dark:bg-zinc-900 dark:ring-zinc-100/10 sm:h-24 sm:w-24">
-              <Image
-                src="/giuseppe.jpeg"
-                alt="Giuseppe"
-                fill
-                className="object-cover"
-                priority
-              />
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-4">
+              <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-zinc-100 shadow-xl ring-4 ring-zinc-900/5 dark:bg-zinc-900 dark:ring-zinc-100/10 sm:h-24 sm:w-24">
+                <Image
+                  src="/giuseppe.jpeg"
+                  alt="Giuseppe"
+                  fill
+                  className="object-cover"
+                  priority
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <p className="text-lg text-zinc-600 dark:text-zinc-400 sm:text-xl">
+                  Ciao👋 io sono
+                </p>
+                <h1 className="text-4xl font-black uppercase tracking-tighter sm:text-5xl">
+                  Giuseppe
+                </h1>
+              </div>
             </div>
-            <div className="flex flex-col gap-1">
-              <p className="text-lg text-zinc-600 dark:text-zinc-400 sm:text-xl">
-                Ciao👋 io sono
-              </p>
-              <h1 className="text-4xl font-black uppercase tracking-tighter sm:text-5xl">
-                Giuseppe
-              </h1>
-            </div>
+            <HowItWorksButton className="shrink-0" />
           </div>
 
           <p className="text-base leading-relaxed text-zinc-600 dark:text-zinc-400 sm:text-lg">
-            confronto prezzi e prodotti per studi dentistici
+            confronto prezzi e prodotti <span className="font-extrabold">su +100K articoli</span> disponibili
           </p>
-          <HowItWorksButton />
-          <div className="mt-5">
+          <div className="mt-10">
             <HomeSearchBox />
           </div>
         </section>

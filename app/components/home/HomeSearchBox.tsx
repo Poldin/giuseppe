@@ -218,7 +218,7 @@ export default function HomeSearchBox() {
           if (query.trim()) addProduct(query);
         }}
         disabled={isSubmitting}
-        placeholder="Cerca un prodotto..."
+        placeholder="Cerca un prodotto alla volta..."
       />
 
       <div className="mt-4">
@@ -302,7 +302,7 @@ export default function HomeSearchBox() {
         </p>
         {!canSubmitList && !isSubmitting ? (
           <p className="mt-5 text-xs text-center text-zinc-500">
-            puoi indicare fino a <span className="font-extrabold">20 prodotti</span> per la ricerca
+            puoi aggiungere fino a <span className="font-extrabold">20 prodotti</span> insieme per la ricerca
           </p>
         ) : null}
         <ul className="mt-2 flex min-h-[8.125rem] flex-col gap-2">
