@@ -2,11 +2,32 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-const SESSION_STORAGE_KEY = "giuseppe.chat-sponsored-banner.dismissed";
+const STORAGE_KEY = "giuseppe.chat-sponsored-banner.dismissed-date";
 const SHOW_DELAY_MS = 10_000;
 const CLOSE_DELAY_MS = 5_000;
+const DAY_CHECK_MS = 60_000;
+
+function getLocalDateKey(): string {
+  return new Date().toLocaleDateString("en-CA");
+}
+
+function wasDismissedToday(): boolean {
+  try {
+    return localStorage.getItem(STORAGE_KEY) === getLocalDateKey();
+  } catch {
+    return false;
+  }
+}
+
+function markDismissedToday(): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, getLocalDateKey());
+  } catch {
+    // localStorage unavailable (private mode, etc.)
+  }
+}
 
 type ChatSponsoredBannerProps = {
   title?: string;
@@ -27,32 +48,68 @@ export function ChatSponsoredBanner({
     Math.ceil(CLOSE_DELAY_MS / 1000)
   );
 
+  const visibleRef = useRef(false);
+
   const dismiss = useCallback(() => {
-    try {
-      sessionStorage.setItem(SESSION_STORAGE_KEY, "1");
-    } catch {
-      // sessionStorage unavailable (private mode, etc.)
-    }
+    markDismissedToday();
     setVisible(false);
   }, []);
 
   useEffect(() => {
-    let dismissed = false;
-    try {
-      dismissed = sessionStorage.getItem(SESSION_STORAGE_KEY) === "1";
-    } catch {
-      dismissed = false;
-    }
+    visibleRef.current = visible;
+  }, [visible]);
 
-    if (dismissed) {
-      return;
-    }
+  useEffect(() => {
+    let showTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const showTimer = window.setTimeout(() => {
-      setVisible(true);
-    }, SHOW_DELAY_MS);
+    const clearShowTimer = () => {
+      if (showTimer) {
+        window.clearTimeout(showTimer);
+        showTimer = null;
+      }
+    };
 
-    return () => window.clearTimeout(showTimer);
+    const scheduleShowIfNeeded = () => {
+      clearShowTimer();
+      if (wasDismissedToday() || visibleRef.current) {
+        return;
+      }
+
+      showTimer = window.setTimeout(() => {
+        if (!wasDismissedToday() && !visibleRef.current) {
+          setVisible(true);
+        }
+      }, SHOW_DELAY_MS);
+    };
+
+    const syncWithToday = () => {
+      if (wasDismissedToday()) {
+        clearShowTimer();
+        setVisible(false);
+        return;
+      }
+
+      if (!visibleRef.current) {
+        scheduleShowIfNeeded();
+      }
+    };
+
+    syncWithToday();
+
+    const dayCheckInterval = window.setInterval(syncWithToday, DAY_CHECK_MS);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        syncWithToday();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      clearShowTimer();
+      window.clearInterval(dayCheckInterval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, []);
 
   useEffect(() => {
