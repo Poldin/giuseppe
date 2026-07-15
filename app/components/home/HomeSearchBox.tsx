@@ -189,7 +189,7 @@ export default function HomeSearchBox() {
       }
 
       try {
-        sessionStorage.setItem("giuseppe:autoAnalisi", "1");
+        sessionStorage.setItem("giuseppe:showRicercaCompletata", "1");
       } catch {
         // ignore storage errors (private mode, etc.)
       }

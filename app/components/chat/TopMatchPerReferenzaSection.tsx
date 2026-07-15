@@ -18,6 +18,10 @@ import {
   type AnalisiReferenzaSlide,
   type IntroDemoData,
 } from "@/app/components/chat/AnalisiUnoPerUnoDialog";
+import {
+  computeProdottiAnalizzati,
+  RicercaCompletataDialog,
+} from "@/app/components/chat/RicercaCompletataDialog";
 import { ProductSearchCombobox } from "@/app/components/home/ProductSearchCombobox";
 import { EcommerceLogoBadge } from "@/app/components/chat/EcommerceLogoBadge";
 import { QuantityControl } from "@/app/components/chat/QuantityControl";
@@ -644,7 +648,8 @@ export function TopMatchPerReferenzaSection({
   const [addingAfterIndex, setAddingAfterIndex] = useState<number | null>(null);
   const [deleteArmedIndex, setDeleteArmedIndex] = useState<number | null>(null);
   const [analisiOpen, setAnalisiOpen] = useState(false);
-  const autoOpenedAnalisiRef = useRef(false);
+  const [ricercaCompletataOpen, setRicercaCompletataOpen] = useState(false);
+  const autoOpenedRicercaRef = useRef(false);
   const prevAddingReferenza = useRef(isAddingReferenza);
   const prevRemovingReferenza = useRef(isRemovingReferenza);
   const pendingScrollToAddRef = useRef<number | null>(null);
@@ -799,24 +804,29 @@ export function TopMatchPerReferenzaSection({
     };
   }, [rowsWithCards, ecommerceOrder]);
 
+  const prodottiAnalizzati = useMemo(
+    () => computeProdottiAnalizzati(analisiSlides),
+    [analisiSlides]
+  );
+
   useEffect(() => {
-    if (autoOpenedAnalisiRef.current || !introDemoData) {
+    if (autoOpenedRicercaRef.current || analisiSlides.length === 0) {
       return;
     }
 
     try {
-      if (sessionStorage.getItem("giuseppe:autoAnalisi") !== "1") {
+      if (sessionStorage.getItem("giuseppe:showRicercaCompletata") !== "1") {
         return;
       }
 
-      sessionStorage.removeItem("giuseppe:autoAnalisi");
+      sessionStorage.removeItem("giuseppe:showRicercaCompletata");
     } catch {
       return;
     }
 
-    autoOpenedAnalisiRef.current = true;
-    setAnalisiOpen(true);
-  }, [introDemoData]);
+    autoOpenedRicercaRef.current = true;
+    setRicercaCompletataOpen(true);
+  }, [analisiSlides.length]);
 
   const rowsByQueryIndex = useMemo(
     () => new Map(rowsWithCards.map((entry) => [entry.row.query_index, entry])),
@@ -1034,6 +1044,13 @@ export function TopMatchPerReferenzaSection({
           showPendingOptimization={showPendingOptimization}
         />
       ) : null}
+
+      <RicercaCompletataDialog
+        open={ricercaCompletataOpen}
+        onOpenChange={setRicercaCompletataOpen}
+        prodottiAnalizzati={prodottiAnalizzati}
+        prezzoTotale={prezzoTotale}
+      />
 
       {removeReferenzaError ? (
         <p className="text-sm text-red-600 dark:text-red-400">{removeReferenzaError}</p>
