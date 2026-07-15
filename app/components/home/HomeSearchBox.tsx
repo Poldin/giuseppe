@@ -301,7 +301,7 @@ export default function HomeSearchBox() {
           La tua ricerca ({selectedProducts.length})
         </p>
         {!canSubmitList && !isSubmitting ? (
-          <p className="mt-5 text-xs text-zinc-500">
+          <p className="mt-5 text-xs text-center text-zinc-500">
             puoi indicare fino a <span className="font-extrabold">20 prodotti</span> per la ricerca
           </p>
         ) : null}
