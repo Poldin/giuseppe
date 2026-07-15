@@ -148,7 +148,7 @@ impl Default for ElaboraConfig {
     }
 }
 
-const MAX_CANDIDATI_PER_ECOMMERCE: usize = 10;
+const MAX_CANDIDATI_PER_ECOMMERCE: usize = 20;
 
 type MatriceOfferte = HashMap<i32, HashMap<String, ProdottoOfferta>>;
 type MatriceCandidati = HashMap<i32, HashMap<String, Vec<ProdottoOfferta>>>;
@@ -783,6 +783,7 @@ mod tests {
                 similarity: 0.8,
                 original_url: None,
                 discount: None,
+                brand: None,
             },
             SupabaseMatch {
                 query_index: 1,
@@ -793,6 +794,7 @@ mod tests {
                 similarity: 0.7,
                 original_url: None,
                 discount: None,
+                brand: None,
             },
             SupabaseMatch {
                 query_index: 0,
@@ -803,6 +805,7 @@ mod tests {
                 similarity: 0.75,
                 original_url: None,
                 discount: None,
+                brand: None,
             },
         ];
 
@@ -816,11 +819,11 @@ mod tests {
     }
 
     #[test]
-    fn top_match_per_referenza_fino_a_dieci_per_ecommerce() {
+    fn top_match_per_referenza_fino_a_venti_per_ecommerce() {
         let prodotti = vec!["guanti".into()];
         let mut matches = Vec::new();
 
-        for i in 0..12 {
+        for i in 0..22 {
             matches.push(SupabaseMatch {
                 query_index: 0,
                 id: format!("e1-{i}"),
@@ -830,6 +833,7 @@ mod tests {
                 similarity: 0.9 - i as f32 * 0.01,
                 original_url: None,
                 discount: None,
+                brand: None,
             });
         }
 
@@ -843,6 +847,7 @@ mod tests {
                 similarity: 0.85 - i as f32 * 0.05,
                 original_url: None,
                 discount: None,
+                brand: None,
             });
         }
 
@@ -858,7 +863,7 @@ mod tests {
             .iter()
             .find(|e| e.ecommerce_id == "e1")
             .expect("dentaltix");
-        assert_eq!(dentaltix.candidati.len(), 10);
+        assert_eq!(dentaltix.candidati.len(), 20);
         assert_eq!(dentaltix.candidati[0].id, "e1-0");
 
         let gerho = riga
@@ -881,6 +886,7 @@ mod tests {
             similarity: 0.05,
             original_url: None,
             discount: None,
+            brand: None,
         }];
 
         let result = elabora_confronto(
@@ -927,6 +933,7 @@ mod tests {
             similarity: 0.8,
             original_url: None,
             discount: None,
+            brand: None,
         }];
 
         let result = elabora_confronto(prodotti, matches, catalogo, None);
