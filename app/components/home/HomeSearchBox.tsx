@@ -297,10 +297,15 @@ export default function HomeSearchBox() {
       </button>
 
       <div className="mt-4">
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
           La tua ricerca ({selectedProducts.length})
         </p>
-        <ul className="flex min-h-[8.125rem] flex-col gap-2">
+        {!canSubmitList && !isSubmitting ? (
+          <p className="mt-5 text-xs text-zinc-500">
+            puoi indicare fino a <span className="font-extrabold">20 prodotti</span> per la ricerca
+          </p>
+        ) : null}
+        <ul className="mt-2 flex min-h-[8.125rem] flex-col gap-2">
           {selectedProducts.map((product, index) => (
             <li
               key={`${product}-${index}`}
@@ -320,12 +325,6 @@ export default function HomeSearchBox() {
           ))}
         </ul>
       </div>
-
-      {!canSubmitList && !isSubmitting ? (
-        <p className="mt-2 text-center text-xs text-zinc-500">
-          indica almeno una ricerca da eseguire
-        </p>
-      ) : null}
 
       {error ? (
         <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
