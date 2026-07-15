@@ -7,6 +7,7 @@ import time
 import random
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlencode
 
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
@@ -39,28 +40,40 @@ ROUTES: dict[str, dict[str, str]] = {
     "studio": {
         "label": "STUDIO",
         "base_url": f"{SITE_ORIGIN}/studio.html",
+        "main_family": "Studio",
     },
     "laboratorio": {
         "label": "LABORATORIO",
         "base_url": f"{SITE_ORIGIN}/laboratorio.html",
+        "main_family": "Laboratorio",
     },
     "apparecchiatura": {
         "label": "APPARECCHIATURA",
         "base_url": f"{SITE_ORIGIN}/apparecchiatura.html",
+        "main_family": "Apparecchiatura",
     },
     "ortodonzia": {
         "label": "ORTODONZIA",
         "base_url": f"{SITE_ORIGIN}/ortodonzia.html",
+        "main_family": "Ortodonzia",
     },
 }
+
+CATALOG_LIST_SELECTOR = ".products-catalog__list .product-card"
 
 MAX_PAGES_PER_ROUTE = 5000
 
 
-def build_catalog_url(base_url: str, page_number: int) -> str:
-    if page_number <= 1:
-        return base_url
-    return f"{base_url}?p={page_number}"
+def build_catalog_url(base_url: str, page_number: int, main_family: str) -> str:
+    query = urlencode(
+        {
+            "p": str(page_number),
+            "limit": "24",
+            "orderBy[bestseller]": "asc",
+            "filters[main_family]": main_family,
+        }
+    )
+    return f"{base_url}?{query}"
 
 
 def log(message: str) -> None:
@@ -229,10 +242,7 @@ def build_product_url(href: str | None, payload: dict | None) -> str | None:
 
 
 def find_products(soup: BeautifulSoup) -> list:
-    listing = soup.select_one(".products-catalog__list")
-    if listing:
-        return listing.select(".product-card")
-    return soup.select(".product-card.products-catalog__item")
+    return soup.select(CATALOG_LIST_SELECTOR)
 
 
 def parse_product_card(card, page_number: int) -> dict | None:
@@ -292,8 +302,13 @@ def parse_product_card(card, page_number: int) -> dict | None:
     }
 
 
-def scrape_page(page_number: int, route_label: str, base_url: str) -> str | None:
-    url = build_catalog_url(base_url, page_number)
+def scrape_page(
+    page_number: int,
+    route_label: str,
+    base_url: str,
+    main_family: str,
+) -> str | None:
+    url = build_catalog_url(base_url, page_number, main_family)
     log(f"[{route_label}] Pagina {page_number}: avvio browser -> {url}")
 
     with sync_playwright() as p:
@@ -315,24 +330,15 @@ def scrape_page(page_number: int, route_label: str, base_url: str) -> str | None
             log(f"[{route_label}] Pagina {page_number}: pagina caricata, titolo: {page.title()!r}")
 
             dismiss_cookie_banner(page, page_number, route_label)
-            try:
-                page.wait_for_selector(
-                    ".products-catalog__list, .product-card.products-catalog__item",
-                    timeout=15000,
-                )
-            except Exception:
-                log(
-                    f"[{route_label}] Pagina {page_number}: "
-                    "catalogo non trovato subito, leggo comunque l'HTML"
-                )
+            page.wait_for_selector(CATALOG_LIST_SELECTOR, timeout=45000)
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             time.sleep(1.0)
 
             html = page.content()
-            card_count = html.count("product-card__name-price-container")
+            card_count = page.locator(CATALOG_LIST_SELECTOR).count()
             log(
                 f"[{route_label}] Pagina {page_number}: HTML scaricato "
-                f"({len(html):,} caratteri, ~{card_count} card nel DOM)"
+                f"({len(html):,} caratteri, {card_count} card nel catalogo)"
             )
         except Exception as e:
             log(
@@ -363,7 +369,7 @@ def parse_and_save(
     if not product_cards:
         log(
             f"[{route_label}] Pagina {page_number}: 0 prodotti trovati "
-            "(selettore .products-catalog__list .product-card)"
+            f"(selettore {CATALOG_LIST_SELECTOR})"
         )
         return -1
 
@@ -446,6 +452,7 @@ def run_route(route_key: str) -> None:
     route = ROUTES[route_key]
     label = route["label"]
     base_url = route["base_url"]
+    main_family = route["main_family"]
 
     print()
     print(f"=== Configurazione rotta {label} ===")
@@ -464,7 +471,7 @@ def run_route(route_key: str) -> None:
     while page_number <= MAX_PAGES_PER_ROUTE:
         log(f"[{label}] --- Inizio pagina {page_number} ---")
 
-        html = scrape_page(page_number, label, base_url)
+        html = scrape_page(page_number, label, base_url, main_family)
         result = parse_and_save(html, page_number, session_id, label)
 
         if result == -1:
