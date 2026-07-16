@@ -607,6 +607,7 @@ export function ChatConfrontoClient({
         ? createPortal(
             <RichiestaSummary
               prodottiRichiesti={confronto.prodotti_richiesti}
+              onNavigateToReferenza={scrollToReferenza}
             />,
             richiestaMount
           )

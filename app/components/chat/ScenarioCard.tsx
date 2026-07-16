@@ -102,6 +102,7 @@ function ScenarioProductBadge({
   onRemoveClick,
   isRemoveArmed = false,
   isRemoving = false,
+  showPendingMarker = false,
 }: {
   productName: string;
   brand?: string | null;
@@ -113,9 +114,21 @@ function ScenarioProductBadge({
   onRemoveClick?: () => void;
   isRemoveArmed?: boolean;
   isRemoving?: boolean;
+  showPendingMarker?: boolean;
 }) {
   const nameClassName =
     "block w-full rounded-md bg-white px-2 py-1 text-left text-md font-bold leading-snug break-words text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200";
+
+  const nameContent = (
+    <>
+      {showPendingMarker ? (
+        <span className="mr-1" aria-hidden="true">
+          ⚡
+        </span>
+      ) : null}
+      {productName}
+    </>
+  );
 
   return (
     <div className="min-w-0 space-y-1.5 sm:contents">
@@ -134,11 +147,25 @@ function ScenarioProductBadge({
             type="button"
             onClick={onNavigateToReferenza}
             className={`${nameClassName} transition-colors hover:text-zinc-900 dark:hover:text-zinc-100`}
+            aria-label={
+              showPendingMarker
+                ? `${productName} (modifica consigliata disponibile)`
+                : undefined
+            }
           >
-            {productName}
+            {nameContent}
           </button>
         ) : (
-          <span className={`${nameClassName} text-xs`}>{productName}</span>
+          <span
+            className={`${nameClassName} text-xs`}
+            aria-label={
+              showPendingMarker
+                ? `${productName} (modifica consigliata disponibile)`
+                : undefined
+            }
+          >
+            {nameContent}
+          </span>
         )}
       </div>
 
@@ -589,6 +616,12 @@ export function ScenarioCard({
     prevRemovingReferenza.current = isRemovingReferenza;
   }, [isRemovingReferenza]);
 
+  const pendingQueryIndexes = new Set(
+    showPendingOptimization
+      ? pendingChanges.map((change) => change.queryIndex)
+      : []
+  );
+
   const handleTrashClick = (queryIndex: number) => {
     if (!onRemoveReferenza || !canRemoveReferenza || isRemovingReferenza) {
       return;
@@ -706,6 +739,8 @@ export function ScenarioCard({
               <ul className="divide-y divide-zinc-200/70 dark:divide-zinc-800/70">
                 {voci.map((voce) => {
                   const queryIndex = queryIndexByOffertaId.get(voce.offerta.id);
+                  const showPendingMarker =
+                    queryIndex != null && pendingQueryIndexes.has(queryIndex);
 
                   return (
                   <li
@@ -717,6 +752,7 @@ export function ScenarioCard({
                       brand={voce.offerta.brand}
                       url={voce.offerta.original_url?.trim() || null}
                       quantita={voce.quantita}
+                      showPendingMarker={showPendingMarker}
                       priceNode={
                         voce.quantita > 1 ? (
                           <span className="whitespace-nowrap">

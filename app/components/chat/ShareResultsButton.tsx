@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ArrowDown } from "lucide-react";
 
 import { calcolaSpedizione, type ShippingTier } from "@/app/lib/search/shipping-cost";
 import type {
@@ -205,8 +206,10 @@ export function CopyInfoButton({
 
 export function RichiestaSummary({
   prodottiRichiesti,
+  onNavigateToReferenza,
 }: {
   prodottiRichiesti: string[];
+  onNavigateToReferenza?: (queryIndex: number) => void;
 }) {
   if (prodottiRichiesti.length === 0) {
     return null;
@@ -217,16 +220,37 @@ export function RichiestaSummary({
       <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
         Richiesta
       </p>
-      <ul className="mt-1.5 flex flex-col gap-1">
+      <ul className="mt-1.5 flex flex-col gap-1.5">
         {prodottiRichiesti.map((prodotto, index) => (
           <li
             key={`${index}-${prodotto}`}
-            className="flex min-w-0 items-start gap-1.5 text-sm text-zinc-700 dark:text-zinc-300"
+            className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm text-zinc-700 dark:text-zinc-300"
           >
             <span className="shrink-0 leading-5" aria-hidden="true">
               🔍
             </span>
-            <span className="min-w-0 break-words leading-5">{prodotto}</span>
+            {onNavigateToReferenza ? (
+              <button
+                type="button"
+                onClick={() => onNavigateToReferenza(index)}
+                className="min-w-0 break-words text-left leading-5 transition-colors hover:text-zinc-900 dark:hover:text-zinc-100"
+              >
+                {prodotto}
+              </button>
+            ) : (
+              <span className="min-w-0 break-words leading-5">{prodotto}</span>
+            )}
+            {onNavigateToReferenza ? (
+              <button
+                type="button"
+                onClick={() => onNavigateToReferenza(index)}
+                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-xs font-light text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                aria-label={`Vai al confronto di ${prodotto}`}
+              >
+                vedi
+                <ArrowDown className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
           </li>
         ))}
       </ul>
