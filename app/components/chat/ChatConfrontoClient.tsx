@@ -23,10 +23,11 @@ import {
   assignmentsFromScenario,
   buildPendingFingerprint,
   buildScenarioFromAssignments,
+  committedAssignmentsEqual,
   computePendingChanges,
   filterCommittedAssignments,
   parseCommittedScenarioPayload,
-  removeCommittedAssignment,
+  reconcileCommittedWithSelezione,
   removeCommittedForReferenza,
   replaceCommittedWithOptimal,
   sanitizeCommittedScenarioForSave,
@@ -75,17 +76,6 @@ function resolveInitialCommittedAssignments(input: {
     input.confronto.user_committed_scenario
   );
 
-  if (saved) {
-    const filtered = filterCommittedAssignments(
-      saved,
-      validOfferIds,
-      maxQueryIndex
-    );
-    if (filtered.length > 0) {
-      return filtered;
-    }
-  }
-
   const selezioni = buildSelezioneFromState(input.cards, input.cardState);
   const calcolo = elaboraConfrontoUtente({
     prodottiRichiesti: input.confronto.prodotti_richiesti,
@@ -93,10 +83,33 @@ function resolveInitialCommittedAssignments(input: {
     catalogoEcommerce: input.catalogoEcommerce,
   });
 
-  return assignmentsFromScenario(
-    calcolo.scenario_risparmio,
-    queryIndexByOffertaId
-  );
+  let assignments: CommittedAssignment[];
+  if (saved) {
+    const filtered = filterCommittedAssignments(
+      saved,
+      validOfferIds,
+      maxQueryIndex
+    );
+    assignments =
+      filtered.length > 0
+        ? filtered
+        : assignmentsFromScenario(
+            calcolo.scenario_risparmio,
+            queryIndexByOffertaId
+          );
+  } else {
+    assignments = assignmentsFromScenario(
+      calcolo.scenario_risparmio,
+      queryIndexByOffertaId
+    );
+  }
+
+  return reconcileCommittedWithSelezione({
+    assignments,
+    selezioni,
+    optimalScenario: calcolo.scenario_risparmio,
+    referenzaCount: input.confronto.prodotti_richiesti.length,
+  });
 }
 
 export function ChatConfrontoClient({
@@ -177,6 +190,23 @@ export function ChatConfrontoClient({
       catalogoEcommerce,
     });
   }, [selezioni, confronto, catalogoEcommerce]);
+
+  useEffect(() => {
+    setCommittedAssignments((current) => {
+      const next = reconcileCommittedWithSelezione({
+        assignments: current,
+        selezioni,
+        optimalScenario: calcolo.scenario_risparmio,
+        referenzaCount: confronto.prodotti_richiesti.length,
+      });
+
+      if (committedAssignmentsEqual(current, next)) {
+        return current;
+      }
+
+      return next;
+    });
+  }, [selezioni, calcolo.scenario_risparmio, confronto.prodotti_richiesti.length]);
 
   const queryIndexByOffertaId = useMemo(
     () => buildQueryIndexByOffertaId(cards),
@@ -453,34 +483,9 @@ export function ChatConfrontoClient({
         return;
       }
 
-      const nextState = toggleCardSelected(cardState, card, cards);
-      setCardState(nextState);
-
-      const nextSelezioni = buildSelezioneFromState(cards, nextState);
-      const nextCalcolo = elaboraConfrontoUtente({
-        prodottiRichiesti: confronto.prodotti_richiesti,
-        selezioni: nextSelezioni,
-        catalogoEcommerce,
-      });
-      const optimalForRow = assignmentsFromScenario(
-        nextCalcolo.scenario_risparmio,
-        queryIndexByOffertaId
-      ).find((assignment) => assignment.query_index === card.queryIndex);
-
-      setCommittedAssignments((current) => {
-        if (optimalForRow) {
-          return upsertCommittedAssignment(current, optimalForRow);
-        }
-        return removeCommittedAssignment(current, card.queryIndex);
-      });
+      setCardState((current) => toggleCardSelected(current, card, cards));
     },
-    [
-      cardState,
-      cards,
-      catalogoEcommerce,
-      confronto.prodotti_richiesti,
-      queryIndexByOffertaId,
-    ]
+    [cards]
   );
 
   const scrollToEcommerceTable = useCallback((ecommerceId: string) => {

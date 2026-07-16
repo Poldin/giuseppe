@@ -261,6 +261,136 @@ function assignmentsEqual(
   );
 }
 
+function committedAssignmentsEqual(
+  left: CommittedAssignment[],
+  right: CommittedAssignment[]
+): boolean {
+  const sanitizedLeft = sanitizeCommittedScenarioForSave(left);
+  const sanitizedRight = sanitizeCommittedScenarioForSave(right);
+
+  if (sanitizedLeft.length !== sanitizedRight.length) {
+    return false;
+  }
+
+  for (let i = 0; i < sanitizedLeft.length; i += 1) {
+    const a = sanitizedLeft[i];
+    const b = sanitizedRight[i];
+    if (
+      a.query_index !== b.query_index ||
+      !assignmentsEqual(a, b)
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function isAssignmentValidForSelezione(
+  assignment: CommittedAssignment,
+  selezioni: SelezioneUtente[]
+): boolean {
+  return selezioni.some(
+    (sel) =>
+      sel.query_index === assignment.query_index &&
+      sel.ecommerce_id === assignment.ecommerce_id &&
+      sel.offerta.id === assignment.offerta_id &&
+      sel.disponibile
+  );
+}
+
+function optimalAssignmentForReferenza(
+  scenario: ScenarioCarrello,
+  queryIndex: number,
+  selezioni: SelezioneUtente[]
+): CommittedAssignment | null {
+  const selectedIds = new Set(
+    selezioni
+      .filter((sel) => sel.query_index === queryIndex && sel.disponibile)
+      .map((sel) => sel.offerta.id)
+  );
+
+  if (selectedIds.size === 0) {
+    return null;
+  }
+
+  for (const [ecommerce_id, voci] of Object.entries(scenario.ordini)) {
+    for (const voce of voci) {
+      if (!selectedIds.has(voce.offerta.id)) {
+        continue;
+      }
+
+      return {
+        query_index: queryIndex,
+        ecommerce_id,
+        offerta_id: voce.offerta.id,
+        quantita: Math.max(1, voce.quantita),
+      };
+    }
+  }
+
+  if (selectedIds.size === 1) {
+    const sel = selezioni.find(
+      (entry) => entry.query_index === queryIndex && entry.disponibile
+    );
+    if (!sel) {
+      return null;
+    }
+
+    return {
+      query_index: queryIndex,
+      ecommerce_id: sel.ecommerce_id,
+      offerta_id: sel.offerta.id,
+      quantita: Math.max(1, sel.quantita),
+    };
+  }
+
+  return null;
+}
+
+export function reconcileCommittedWithSelezione(input: {
+  assignments: CommittedAssignment[];
+  selezioni: SelezioneUtente[];
+  optimalScenario: ScenarioCarrello;
+  referenzaCount: number;
+}): CommittedAssignment[] {
+  let next = input.assignments;
+
+  for (let queryIndex = 0; queryIndex < input.referenzaCount; queryIndex += 1) {
+    const selezioniForRef = input.selezioni.filter(
+      (sel) => sel.query_index === queryIndex
+    );
+    const current = next.find((assignment) => assignment.query_index === queryIndex);
+
+    if (selezioniForRef.length === 0) {
+      if (current) {
+        next = removeCommittedAssignment(next, queryIndex);
+      }
+      continue;
+    }
+
+    if (current && isAssignmentValidForSelezione(current, input.selezioni)) {
+      continue;
+    }
+
+    const replacement = optimalAssignmentForReferenza(
+      input.optimalScenario,
+      queryIndex,
+      input.selezioni
+    );
+
+    if (replacement) {
+      next = upsertCommittedAssignment(next, replacement);
+    } else if (current) {
+      next = removeCommittedAssignment(next, queryIndex);
+    }
+  }
+
+  return sanitizeCommittedScenarioForSave(next);
+}
+
+export { committedAssignmentsEqual };
+
 function buildPendingRowAssignment(input: {
   ecommerceId: string;
   ecommerceName: string;
