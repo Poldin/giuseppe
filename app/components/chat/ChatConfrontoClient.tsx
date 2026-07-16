@@ -13,7 +13,7 @@ import { createPortal } from "react-dom";
 import { ConfrontoEcommerceTable } from "@/app/components/chat/ConfrontoEcommerceTable";
 import { EcommerceRankingCard } from "@/app/components/chat/EcommerceRankingCard";
 import { ScenarioCard } from "@/app/components/chat/ScenarioCard";
-import { ChatShareActions } from "@/app/components/chat/ShareResultsButton";
+import { ChatShareActions, RichiestaSummary } from "@/app/components/chat/ShareResultsButton";
 import { TopMatchPerReferenzaSection } from "@/app/components/chat/TopMatchPerReferenzaSection";
 import {
   buildInitialCardState,
@@ -275,11 +275,15 @@ export function ChatConfrontoClient({
     [catalogoEcommerce]
   );
 
-  const [shareActionsMount, setShareActionsMount] =
+  const [shareButtonsMount, setShareButtonsMount] =
     useState<HTMLElement | null>(null);
+  const [richiestaMount, setRichiestaMount] = useState<HTMLElement | null>(
+    null
+  );
 
   useLayoutEffect(() => {
-    setShareActionsMount(document.getElementById("chat-results-actions"));
+    setShareButtonsMount(document.getElementById("chat-share-buttons"));
+    setRichiestaMount(document.getElementById("chat-richiesta-summary"));
   }, []);
 
   useEffect(() => {
@@ -588,14 +592,23 @@ export function ChatConfrontoClient({
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-8 sm:gap-10">
-      {shareActionsMount
+      {shareButtonsMount
         ? createPortal(
             <ChatShareActions
               scenario={committedScenario}
               catalogById={catalogById}
               tiersByEcommerce={tiersByEcommerce}
+              prodottiRichiesti={confronto.prodotti_richiesti}
             />,
-            shareActionsMount
+            shareButtonsMount
+          )
+        : null}
+      {richiestaMount
+        ? createPortal(
+            <RichiestaSummary
+              prodottiRichiesti={confronto.prodotti_richiesti}
+            />,
+            richiestaMount
           )
         : null}
 

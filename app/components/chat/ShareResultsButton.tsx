@@ -33,25 +33,45 @@ function formatScenarioSummary(
 }
 
 export function buildMatchShareText(scenario: ScenarioCarrello): string {
-  return `match migliore: ${formatScenarioSummary(
-    scenario.copertura,
-    scenario.copertura_totale,
-    scenario.prezzo_prodotti,
-    scenario.prezzo_spedizione
-  )} -> totale ${formatPrice(scenario.prezzo_totale)}`;
+  return `${scenario.titolo} -> totale ${formatPrice(scenario.prezzo_totale)}`;
+}
+
+export function buildRichiestaText(prodottiRichiesti: string[]): string {
+  if (prodottiRichiesti.length === 0) {
+    return "";
+  }
+
+  return [
+    "---RICHIESTA---",
+    ...prodottiRichiesti.map((prodotto) => `🔍 ${prodotto}`),
+  ].join("\n");
 }
 
 export function buildScenarioInfoText(
   scenario: ScenarioCarrello,
   catalogById: Record<string, TabellaEcommerce>,
   tiersByEcommerce: Record<string, ShippingTier[]>,
-  pageUrl?: string
+  pageUrl?: string,
+  prodottiRichiesti: string[] = []
 ): string {
-  const lines: string[] = [
-    scenario.titolo,
-    buildMatchShareText(scenario),
-    "",
-  ];
+  const lines: string[] = [];
+
+  const richiestaText = buildRichiestaText(prodottiRichiesti);
+  if (richiestaText) {
+    lines.push(richiestaText, "");
+  }
+
+  lines.push("---RISPOSTA---");
+  lines.push(buildMatchShareText(scenario));
+  lines.push(
+    formatScenarioSummary(
+      scenario.copertura,
+      scenario.copertura_totale,
+      scenario.prezzo_prodotti,
+      scenario.prezzo_spedizione
+    ),
+    ""
+  );
 
   for (const [ecomId, voci] of Object.entries(scenario.ordini)) {
     const ecom = catalogById[ecomId];
@@ -66,7 +86,7 @@ export function buildScenarioInfoText(
     );
     const totaleParziale = prezzoProdottiEcom + prezzoSpedizioneEcom;
 
-    lines.push(`${ecommerceName} — ${formatPrice(totaleParziale)}`);
+    lines.push(`👉 ${ecommerceName} — ${formatPrice(totaleParziale)}`);
     lines.push(
       formatScenarioSummary(
         voci.length,
@@ -102,9 +122,7 @@ export function buildScenarioInfoText(
   }
 
   lines.push("");
-  lines.push(
-    "❤️‍🔥 Giuseppe"
-  );
+  lines.push("❤️‍🔥 Giuseppe");
 
   return lines.join("\n").trim();
 }
@@ -185,21 +203,55 @@ export function CopyInfoButton({
   );
 }
 
+export function RichiestaSummary({
+  prodottiRichiesti,
+}: {
+  prodottiRichiesti: string[];
+}) {
+  if (prodottiRichiesti.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="min-w-0">
+      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        Richiesta
+      </p>
+      <ul className="mt-1.5 flex flex-col gap-1">
+        {prodottiRichiesti.map((prodotto, index) => (
+          <li
+            key={`${index}-${prodotto}`}
+            className="flex min-w-0 items-start gap-1.5 text-sm text-zinc-700 dark:text-zinc-300"
+          >
+            <span className="shrink-0 leading-5" aria-hidden="true">
+              🔍
+            </span>
+            <span className="min-w-0 break-words leading-5">{prodotto}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function ChatShareActions({
   scenario,
   catalogById,
   tiersByEcommerce,
+  prodottiRichiesti,
 }: {
   scenario: ScenarioCarrello;
   catalogById: Record<string, TabellaEcommerce>;
   tiersByEcommerce: Record<string, ShippingTier[]>;
+  prodottiRichiesti: string[];
 }) {
   const shareText = buildMatchShareText(scenario);
   const infoText = buildScenarioInfoText(
     scenario,
     catalogById,
     tiersByEcommerce,
-    typeof window !== "undefined" ? window.location.href : undefined
+    typeof window !== "undefined" ? window.location.href : undefined,
+    prodottiRichiesti
   );
 
   return (

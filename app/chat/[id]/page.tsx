@@ -106,14 +106,17 @@ export default async function ChatPage({ params }: ChatPageProps) {
           <h1 className="text-3xl font-black uppercase tracking-tighter sm:text-4xl">
             Risultati
           </h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <HowItWorksButton />
-            <div
-              id="chat-results-actions"
-              className="flex flex-wrap items-center gap-2"
-            >
-              {!hasLiveConfronto ? <ShareResultsButton /> : null}
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <HowItWorksButton />
+              <div
+                id="chat-share-buttons"
+                className="flex flex-wrap items-center gap-2"
+              >
+                {!hasLiveConfronto ? <ShareResultsButton /> : null}
+              </div>
             </div>
+            <div id="chat-richiesta-summary" className="min-w-0" />
           </div>
         </div>
 
