@@ -94,7 +94,7 @@ export default async function ChatPage({ params }: ChatPageProps) {
 
   return (
     <div className="min-h-screen w-full min-w-0 bg-white font-sans text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
-      <main className="mx-auto w-full min-w-0 max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <main className="mx-auto w-full min-w-0 max-w-6xl px-1 py-6 sm:px-6 sm:py-8">
         <div className="mb-6 flex flex-col gap-3 pr-36 sm:mb-8 sm:pr-0">
           <Link
             href="/"

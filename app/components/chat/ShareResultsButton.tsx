@@ -45,7 +45,7 @@ export function ShareResultsButton({
 
   return (
     <button type="button" onClick={() => void handleShare()} className={className}>
-      {feedback ?? "Condividi confronto"}
+      {feedback ?? "Condividi"}
     </button>
   );
 }

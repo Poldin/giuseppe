@@ -86,7 +86,7 @@ export function ConfrontoEcommerceTable({
           <table className="min-w-full w-max text-sm [&_td]:whitespace-normal [&_th]:whitespace-normal">
             <thead>
               <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/70">
-                <th className="sticky left-0 z-20 min-w-[9rem] border-r border-zinc-200 bg-zinc-50 px-3 py-3 text-left align-bottom font-semibold sm:min-w-[11rem] sm:px-5 dark:border-zinc-800 dark:bg-zinc-900/70">
+                <th className="min-w-[9rem] border-r border-zinc-200 bg-zinc-50 px-3 py-3 text-left align-bottom font-semibold sm:min-w-[11rem] sm:px-5 dark:border-zinc-800 dark:bg-zinc-900/70">
                   Richiesto
                 </th>
                 {tabelle.map((tabella, index) => (
@@ -94,7 +94,7 @@ export function ConfrontoEcommerceTable({
                     key={tabella.ecommerce_id}
                     id={`ecommerce-col-${tabella.ecommerce_id}`}
                     tabIndex={-1}
-                    className="min-w-[10.5rem] scroll-mt-24 border-r border-zinc-200 px-3 py-3 text-left align-bottom last:border-r-0 sm:min-w-[12rem] sm:px-4 dark:border-zinc-800"
+                    className="min-w-[10.5rem] border-r border-zinc-200 px-3 py-3 text-left align-bottom last:border-r-0 sm:min-w-[12rem] sm:px-4 dark:border-zinc-800"
                   >
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center gap-2">
@@ -140,7 +140,7 @@ export function ConfrontoEcommerceTable({
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-900">
               {referenze.map((referenza) => (
                 <tr key={referenza.query_index}>
-                  <td className="sticky left-0 z-10 border-r border-zinc-100 bg-white px-3 py-2 align-top font-medium break-words sm:px-5 sm:py-3 dark:border-zinc-900 dark:bg-zinc-950">
+                  <td className="border-r border-zinc-100 bg-white px-3 py-2 align-top font-medium break-words sm:px-5 sm:py-3 dark:border-zinc-900 dark:bg-zinc-950">
                     {onNavigateToReferenza ? (
                       <button
                         type="button"

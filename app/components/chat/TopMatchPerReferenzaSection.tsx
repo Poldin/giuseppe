@@ -452,7 +452,7 @@ function EcommerceMatchStrip({
 
       <div
         ref={scrollRef}
-        className="-mx-4 min-w-0 overflow-x-auto px-4 pb-1 scrollbar-none touch-pan-x sm:-mx-1 sm:px-1"
+        className="-mx-4 min-w-0 overflow-x-auto px-4 pb-1 scrollbar-none touch-[pan-x_pan-y] sm:-mx-1 sm:px-1"
       >
         <div className="flex w-max items-stretch">
           {visibleCards.map((card, index) => {
@@ -1023,14 +1023,6 @@ export function TopMatchPerReferenzaSection({
             Analizza 1 per 1 🧐
           </button>
         </div>
-
-        <button
-          type="button"
-          onClick={toggleCollapseAll}
-          className="shrink-0 self-end rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-800 shadow-sm transition-colors hover:bg-zinc-50 sm:self-auto dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
-        >
-          {allCollapsed ? "apri tutte" : "chiudi tutte"}
-        </button>
       </div>
 
       {introDemoData ? (

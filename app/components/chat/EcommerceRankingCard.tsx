@@ -24,7 +24,7 @@ export function EcommerceRankingCard({
 
   return (
     <div className="overflow-hidden rounded-2xl">
-      <header className="px-3 py-2.5 sm:px-4 sm:py-3">
+      <header className="px-1 py-2.5 sm:px-4 sm:py-3">
         <h3 className="text-base font-bold sm:text-lg">Classifica fornitori</h3>
         <p className="mt-0.5 text-[11px] text-zinc-500 sm:text-xs">
           scopri chi offre di più.
@@ -36,7 +36,7 @@ export function EcommerceRankingCard({
           Nessuna selezione attiva. Seleziona almeno un prodotto per referenza.
         </p>
       ) : (
-        <ul className="flex flex-col gap-2 p-3 sm:p-4">
+        <ul className="flex flex-col gap-2 sm:p-4">
           {topTabelle.map((tabella, index) => (
             <li
               key={tabella.ecommerce_id}

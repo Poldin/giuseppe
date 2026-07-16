@@ -302,7 +302,7 @@ export default function HomeSearchBox() {
         </p>
         {!canSubmitList && !isSubmitting ? (
           <p className="mt-5 text-xs text-center text-zinc-500">
-            puoi aggiungere fino a <span className="font-extrabold">20 prodotti</span> insieme per la ricerca
+            puoi aggiungere fino a <span className="font-extrabold">20 prodotti</span> per ricerca
           </p>
         ) : null}
         <ul className="mt-2 flex min-h-[8.125rem] flex-col gap-2">
