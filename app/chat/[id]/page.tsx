@@ -91,6 +91,7 @@ export default async function ChatPage({ params }: ChatPageProps) {
   const legacyResults = Array.isArray(chat.results)
     ? (chat.results as ProductSearchResult[])
     : [];
+  const hasLiveConfronto = Boolean(confronto?.top_match_per_referenza?.length);
 
   return (
     <div className="min-h-screen w-full min-w-0 bg-white font-sans text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
@@ -107,12 +108,17 @@ export default async function ChatPage({ params }: ChatPageProps) {
           </h1>
           <div className="flex flex-wrap items-center gap-2">
             <HowItWorksButton />
-            <ShareResultsButton />
+            <div
+              id="chat-results-actions"
+              className="flex flex-wrap items-center gap-2"
+            >
+              {!hasLiveConfronto ? <ShareResultsButton /> : null}
+            </div>
           </div>
         </div>
 
         {confronto ? (
-          confronto.top_match_per_referenza?.length ? (
+          hasLiveConfronto ? (
             <ChatConfrontoClient chatId={id} confronto={confronto} />
           ) : (
             <StaticConfrontoFallback />

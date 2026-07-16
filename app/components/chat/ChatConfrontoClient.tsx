@@ -1,10 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 
 import { ConfrontoEcommerceTable } from "@/app/components/chat/ConfrontoEcommerceTable";
 import { EcommerceRankingCard } from "@/app/components/chat/EcommerceRankingCard";
 import { ScenarioCard } from "@/app/components/chat/ScenarioCard";
+import { ChatShareActions } from "@/app/components/chat/ShareResultsButton";
 import { TopMatchPerReferenzaSection } from "@/app/components/chat/TopMatchPerReferenzaSection";
 import {
   buildInitialCardState,
@@ -265,6 +274,13 @@ export function ChatConfrontoClient({
     () => buildShippingTiersMap(catalogoEcommerce),
     [catalogoEcommerce]
   );
+
+  const [shareActionsMount, setShareActionsMount] =
+    useState<HTMLElement | null>(null);
+
+  useLayoutEffect(() => {
+    setShareActionsMount(document.getElementById("chat-results-actions"));
+  }, []);
 
   useEffect(() => {
     const enableTimer = window.setTimeout(() => {
@@ -572,6 +588,17 @@ export function ChatConfrontoClient({
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-8 sm:gap-10">
+      {shareActionsMount
+        ? createPortal(
+            <ChatShareActions
+              scenario={committedScenario}
+              catalogById={catalogById}
+              tiersByEcommerce={tiersByEcommerce}
+            />,
+            shareActionsMount
+          )
+        : null}
+
       <button
         type="button"
         onClick={scrollToRisparmioAssoluto}

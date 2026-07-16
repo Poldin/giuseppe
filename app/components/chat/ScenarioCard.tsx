@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUpRight, Loader2, Plus, Trash2, X } from "lucide-react";
 
@@ -49,11 +55,48 @@ function DiscountedPrice({
   );
 }
 
+function RemoveReferenzaButton({
+  onRemoveClick,
+  isRemoveArmed,
+  isRemoving,
+  className,
+}: {
+  onRemoveClick: () => void;
+  isRemoveArmed: boolean;
+  isRemoving: boolean;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onRemoveClick}
+      disabled={isRemoving}
+      aria-label={
+        isRemoveArmed
+          ? "Conferma eliminazione referenza"
+          : "Elimina referenza"
+      }
+      className={`shrink-0 rounded-md p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+        isRemoveArmed
+          ? "bg-red-600 text-white hover:bg-red-700"
+          : "font-light text-zinc-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400"
+      } ${className ?? ""}`}
+    >
+      {isRemoving ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+      )}
+    </button>
+  );
+}
+
 function ScenarioProductBadge({
   productName,
   brand,
   url,
   quantita,
+  priceNode,
   onNavigateToReferenza,
   onQuantityChange,
   onRemoveClick,
@@ -64,54 +107,42 @@ function ScenarioProductBadge({
   brand?: string | null;
   url: string | null;
   quantita: number;
+  priceNode: ReactNode;
   onNavigateToReferenza?: () => void;
   onQuantityChange?: (next: number) => void;
   onRemoveClick?: () => void;
   isRemoveArmed?: boolean;
   isRemoving?: boolean;
 }) {
+  const nameClassName =
+    "block w-full rounded-md bg-white px-2 py-1 text-left text-md font-bold leading-snug break-words text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200";
+
   return (
-    <div className="min-w-0 space-y-1.5">
-      <div className="flex min-w-0 items-start gap-1.5">
+    <div className="min-w-0 space-y-1.5 sm:contents">
+      <div className="flex min-w-0 items-start gap-1.5 sm:col-start-1 sm:row-start-1">
         {onRemoveClick ? (
-          <button
-            type="button"
-            onClick={onRemoveClick}
-            disabled={isRemoving}
-            aria-label={
-              isRemoveArmed
-                ? "Conferma eliminazione referenza"
-                : "Elimina referenza"
-            }
-            className={`mt-0.5 shrink-0 rounded-md p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-              isRemoveArmed
-                ? "bg-red-600 text-white hover:bg-red-700"
-                : "font-light text-zinc-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400"
-            }`}
-          >
-            {isRemoving ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-            )}
-          </button>
+          <RemoveReferenzaButton
+            onRemoveClick={onRemoveClick}
+            isRemoveArmed={isRemoveArmed}
+            isRemoving={isRemoving}
+            className="mt-0.5 hidden sm:inline-flex"
+          />
         ) : null}
 
         {onNavigateToReferenza ? (
           <button
             type="button"
             onClick={onNavigateToReferenza}
-            className="inline-block w-fit max-w-full rounded-md bg-white px-2 py-1 text-left text-md font-bold leading-snug break-words text-zinc-700 transition-colors hover:text-zinc-900 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:text-zinc-100"
+            className={`${nameClassName} transition-colors hover:text-zinc-900 dark:hover:text-zinc-100`}
           >
             {productName}
           </button>
         ) : (
-          <span className="inline-block w-fit max-w-full rounded-md bg-white px-2 py-1 text-xs font-bold leading-snug break-words text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
-            {productName}
-          </span>
+          <span className={`${nameClassName} text-xs`}>{productName}</span>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-1.5">
+
+      <div className="flex flex-wrap items-center gap-1.5 sm:col-start-1 sm:row-start-2">
         {brand ? (
           <span className="inline-flex shrink-0 items-center px-2 py-0.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">
             {brand}
@@ -134,6 +165,20 @@ function ScenarioProductBadge({
             quantity={quantita}
             onQuantityChange={onQuantityChange}
             compact
+          />
+        ) : null}
+      </div>
+
+      <div className="flex items-center justify-between gap-3 sm:contents">
+        <div className="min-w-0 text-sm tabular-nums text-zinc-600 sm:col-start-2 sm:row-span-2 sm:self-center sm:text-right dark:text-zinc-400">
+          {priceNode}
+        </div>
+        {onRemoveClick ? (
+          <RemoveReferenzaButton
+            onRemoveClick={onRemoveClick}
+            isRemoveArmed={isRemoveArmed}
+            isRemoving={isRemoving}
+            className="sm:hidden"
           />
         ) : null}
       </div>
@@ -658,20 +703,37 @@ export function ScenarioCard({
                   ))}
                 </div>
               ) : null}
-              <ul className="space-y-2">
+              <ul className="divide-y divide-zinc-200/70 dark:divide-zinc-800/70">
                 {voci.map((voce) => {
                   const queryIndex = queryIndexByOffertaId.get(voce.offerta.id);
 
                   return (
                   <li
                     key={voce.offerta.id}
-                    className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 sm:items-center sm:gap-x-4"
+                    className="flex flex-col gap-1.5 py-2.5 first:pt-0 last:pb-0 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-x-4 sm:gap-y-1"
                   >
                     <ScenarioProductBadge
                       productName={voce.offerta.product_name}
                       brand={voce.offerta.brand}
                       url={voce.offerta.original_url?.trim() || null}
                       quantita={voce.quantita}
+                      priceNode={
+                        voce.quantita > 1 ? (
+                          <span className="whitespace-nowrap">
+                            × {formatPrice(voce.offerta.prezzo)} ={" "}
+                            <DiscountedPrice
+                              amount={voce.prezzo_riga}
+                              offerta={voce.offerta}
+                              className="font-semibold text-zinc-900 dark:text-zinc-100"
+                            />
+                          </span>
+                        ) : (
+                          <DiscountedPrice
+                            amount={voce.prezzo_riga}
+                            offerta={voce.offerta}
+                          />
+                        )
+                      }
                       onNavigateToReferenza={
                         onNavigateToReferenza && queryIndex != null
                           ? () => onNavigateToReferenza(queryIndex)
@@ -701,23 +763,6 @@ export function ScenarioCard({
                         isRemovingReferenza && deleteArmedIndex === queryIndex
                       }
                     />
-                    <div className="shrink-0 self-center text-right text-sm tabular-nums text-zinc-600 dark:text-zinc-400">
-                      {voce.quantita > 1 ? (
-                        <span className="whitespace-nowrap">
-                          × {formatPrice(voce.offerta.prezzo)} ={" "}
-                          <DiscountedPrice
-                            amount={voce.prezzo_riga}
-                            offerta={voce.offerta}
-                            className="font-semibold text-zinc-900 dark:text-zinc-100"
-                          />
-                        </span>
-                      ) : (
-                        <DiscountedPrice
-                          amount={voce.prezzo_riga}
-                          offerta={voce.offerta}
-                        />
-                      )}
-                    </div>
                   </li>
                   );
                 })}
