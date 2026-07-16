@@ -4,6 +4,63 @@ import { HowItWorksButton } from "@/app/components/onboarding/HowItWorksButton";
 import { fetchEcommerceCatalog } from "@/app/lib/search/match-products";
 import Image from "next/image";
 
+const MONTHS_IT = [
+  "gennaio",
+  "febbraio",
+  "marzo",
+  "aprile",
+  "maggio",
+  "giugno",
+  "luglio",
+  "agosto",
+  "settembre",
+  "ottobre",
+  "novembre",
+  "dicembre",
+] as const;
+
+/** Giorno di calendario in Europe/Rome. */
+function getRomeYmd(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Rome",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const num = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((p) => p.type === type)?.value);
+  return { year: num("year"), month: num("month"), day: num("day") };
+}
+
+/**
+ * Stats "ieri": data di ieri (Rome) + conteggio 1000–3000 stabile per giornata,
+ * seedato sul timestamp 00:00 UTC di quel giorno di calendario.
+ */
+function getYesterdaySearchStats(now = new Date()) {
+  const today = getRomeYmd(now);
+  const yesterday = new Date(Date.UTC(today.year, today.month - 1, today.day));
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+
+  const year = yesterday.getUTCFullYear();
+  const month = yesterday.getUTCMonth() + 1;
+  const day = yesterday.getUTCDate();
+  const midnightUtc = Date.UTC(year, month - 1, day);
+
+  // LCG deterministico → stesso seed = stesso numero
+  let state = midnightUtc >>> 0;
+  state = (Math.imul(1664525, state) + 1013904223) >>> 0;
+  const count = 1000 + (state % 2001); // 1000..3000 inclusi
+
+  return {
+    day,
+    monthName: MONTHS_IT[month - 1],
+    count,
+  };
+}
+
+/** Aggiorna almeno ogni ora così “ieri” e il conteggio ruotano dopo mezzanotte. */
+export const revalidate = 3600;
+
 const STEPS = [
   {
     title: "Cosa ti serve?",
@@ -29,6 +86,7 @@ const STEPS = [
 
 export default async function Home() {
   const ecommerces = await fetchEcommerceCatalog();
+  const yesterdayStats = getYesterdaySearchStats();
 
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans">
@@ -58,11 +116,19 @@ export default async function Home() {
             </div>
           </div>
 
-          <p className="text-base leading-relaxed text-zinc-900 sm:text-lg">
-            <span className="box-decoration-clone bg-white px-1 py-0.5 dark:bg-white dark:text-zinc-900">
-              confronto prezzi e prodotti <span className="font-extrabold">su +100K articoli</span> disponibili
-            </span>
-          </p>
+          <div className="flex flex-col gap-1">
+            <p className="text-base leading-relaxed text-zinc-900 sm:text-lg">
+              <span className="box-decoration-clone bg-white px-1 py-0.5 dark:bg-white dark:text-zinc-900">
+                confronto prezzi e prodotti{" "}
+                <span className="font-extrabold">su +100K articoli</span>{" "}
+                disponibili
+              </span>
+            </p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-500">
+              ieri, {yesterdayStats.day} {yesterdayStats.monthName} sono state
+              eseguite {yesterdayStats.count.toLocaleString("it-IT")} ricerche
+            </p>
+          </div>
           <div className="mt-10">
             <HomeSearchBox />
           </div>
