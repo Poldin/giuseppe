@@ -103,7 +103,7 @@ export function buildScenarioInfoText(
 
   lines.push("");
   lines.push(
-    "sono GIUSEPPE ❤️‍🔥 confronto prezzi e prodotti su +100K articoli odontoiatrici"
+    "❤️‍🔥 Giuseppe"
   );
 
   return lines.join("\n").trim();
