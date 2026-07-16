@@ -194,7 +194,7 @@ export function buildScenarioFromAssignments(
   const prezzo_spedizione = spedizioneOrdini(ordini, tiersByEcommerce);
 
   return {
-    titolo: "💸Risparmio assoluto",
+    titolo: "💸Miglior soluzione",
     prezzo_prodotti,
     prezzo_spedizione,
     prezzo_totale: prezzo_prodotti + prezzo_spedizione,

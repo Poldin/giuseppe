@@ -384,7 +384,7 @@ export function elaboraConfrontoUtente(input: {
 
     return {
 
-      titolo: "💸Risparmio assoluto",
+      titolo: "💸Miglior soluzione",
 
       prezzo_prodotti,
 

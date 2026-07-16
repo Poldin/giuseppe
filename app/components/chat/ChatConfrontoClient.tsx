@@ -595,6 +595,7 @@ export function ChatConfrontoClient({
       {shareButtonsMount
         ? createPortal(
             <ChatShareActions
+              chatId={chatId}
               scenario={committedScenario}
               catalogById={catalogById}
               tiersByEcommerce={tiersByEcommerce}
@@ -617,7 +618,7 @@ export function ChatConfrontoClient({
         type="button"
         onClick={scrollToRisparmioAssoluto}
         className="fixed top-3 right-3 z-50 flex items-center gap-1.5 rounded-2xl border border-zinc-200 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-sm transition-transform hover:scale-[1.02] active:scale-[0.98] sm:top-4 sm:right-4 sm:gap-2 sm:px-4 sm:py-3 dark:border-zinc-700 dark:bg-zinc-900/95"
-        aria-label={`Risparmio assoluto: ${formatPrice(committedScenario.prezzo_totale)}. Vai alla sezione.`}
+        aria-label={`Miglior soluzione: ${formatPrice(committedScenario.prezzo_totale)}. Vai alla sezione.`}
       >
         <span className="text-2xl leading-none sm:text-3xl" aria-hidden="true">
           💸

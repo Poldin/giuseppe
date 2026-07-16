@@ -1,151 +1,84 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowDown } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowDown, ChevronDown, FileDown, FileText, Share2 } from "lucide-react";
 
-import { calcolaSpedizione, type ShippingTier } from "@/app/lib/search/shipping-cost";
 import type {
   ScenarioCarrello,
   TabellaEcommerce,
 } from "@/app/lib/search/elabora-scenari";
+import type { ShippingTier } from "@/app/lib/search/shipping-cost";
+import {
+  buildMatchShareText,
+  buildScenarioExportDocument,
+  buildScenarioExportFilename,
+  exportDocumentToText,
+  type ScenarioExportDocument,
+} from "@/app/lib/search/scenario-export";
 
 const buttonClassName =
   "w-fit rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 dark:border-transparent dark:bg-zinc-900 dark:font-semibold dark:text-white dark:hover:bg-zinc-800";
 
-function formatPrice(value: number): string {
-  return new Intl.NumberFormat("it-IT", {
-    style: "currency",
-    currency: "EUR",
-  }).format(value);
-}
+const menuItemClassName =
+  "flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-60 dark:text-zinc-200 dark:hover:bg-zinc-800";
 
-function formatScenarioSummary(
-  copertura: number,
-  coperturaTotale: number,
-  prezzoProdotti: number,
-  prezzoSpedizione: number
-): string {
-  const spedizioneLabel =
-    prezzoSpedizione > 0
-      ? `spedizione ${formatPrice(prezzoSpedizione)}`
-      : "spedizione 0 €";
-
-  return `${copertura}/${coperturaTotale} referenze · prodotti ${formatPrice(prezzoProdotti)} · ${spedizioneLabel}`;
-}
-
-export function buildMatchShareText(scenario: ScenarioCarrello): string {
-  return `${scenario.titolo} -> totale ${formatPrice(scenario.prezzo_totale)}`;
-}
-
-export function buildRichiestaText(prodottiRichiesti: string[]): string {
-  if (prodottiRichiesti.length === 0) {
-    return "";
-  }
-
-  return [
-    "---RICHIESTA---",
-    ...prodottiRichiesti.map((prodotto) => `🔍 ${prodotto}`),
-  ].join("\n");
-}
-
-export function buildScenarioInfoText(
-  scenario: ScenarioCarrello,
-  catalogById: Record<string, TabellaEcommerce>,
-  tiersByEcommerce: Record<string, ShippingTier[]>,
-  pageUrl?: string,
-  prodottiRichiesti: string[] = []
-): string {
-  const lines: string[] = [];
-
-  const richiestaText = buildRichiestaText(prodottiRichiesti);
-  if (richiestaText) {
-    lines.push(richiestaText, "");
-  }
-
-  lines.push("---RISPOSTA---");
-  lines.push(buildMatchShareText(scenario));
-  lines.push(
-    formatScenarioSummary(
-      scenario.copertura,
-      scenario.copertura_totale,
-      scenario.prezzo_prodotti,
-      scenario.prezzo_spedizione
-    ),
-    ""
-  );
-
-  for (const [ecomId, voci] of Object.entries(scenario.ordini)) {
-    const ecom = catalogById[ecomId];
-    const ecommerceName = ecom?.ecommerce_name ?? ecomId;
-    const prezzoProdottiEcom = voci.reduce(
-      (sum, voce) => sum + voce.prezzo_riga,
-      0
-    );
-    const prezzoSpedizioneEcom = calcolaSpedizione(
-      prezzoProdottiEcom,
-      tiersByEcommerce[ecomId] ?? []
-    );
-    const totaleParziale = prezzoProdottiEcom + prezzoSpedizioneEcom;
-
-    lines.push(`👉 ${ecommerceName} — ${formatPrice(totaleParziale)}`);
-    lines.push(
-      formatScenarioSummary(
-        voci.length,
-        scenario.copertura_totale,
-        prezzoProdottiEcom,
-        prezzoSpedizioneEcom
-      )
-    );
-
-    for (const voce of voci) {
-      const priceLine =
-        voce.quantita > 1
-          ? `${voce.quantita} × ${formatPrice(voce.offerta.prezzo)} = ${formatPrice(voce.prezzo_riga)}`
-          : formatPrice(voce.prezzo_riga);
-      const brand = voce.offerta.brand?.trim();
-      const name = brand
-        ? `${voce.offerta.product_name} (${brand})`
-        : voce.offerta.product_name;
-
-      lines.push(`• ${name} — ${priceLine}`);
-
-      const url = voce.offerta.original_url?.trim();
-      if (url) {
-        lines.push(`  ${url}`);
-      }
-    }
-
-    lines.push("");
-  }
-
-  if (pageUrl) {
-    lines.push(`Trovi tutto al link: ${pageUrl}`);
-  }
-
-  lines.push("");
-  lines.push("❤️‍🔥 Giuseppe");
-
-  return lines.join("\n").trim();
-}
+export { buildMatchShareText, buildScenarioInfoText } from "@/app/lib/search/scenario-export";
 
 export function ShareResultsButton({
   className = buttonClassName,
   shareText = "Guarda il confronto prezzi che ho fatto con Giuseppe",
+  chatId,
+  exportDocument,
 }: {
   className?: string;
   shareText?: string;
+  chatId?: string;
+  exportDocument?: ScenarioExportDocument;
 }) {
+  const hasExportMenu = Boolean(chatId && exportDocument);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    };
+
+    window.document.addEventListener("mousedown", handlePointerDown);
+    window.document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.document.removeEventListener("mousedown", handlePointerDown);
+      window.document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [menuOpen]);
+
+  const showFeedback = (message: string, ms = 2000) => {
+    setFeedback(message);
+    window.setTimeout(() => setFeedback(null), ms);
+  };
 
   const handleShare = async () => {
+    setMenuOpen(false);
+    setFeedback(null);
+
     const url = window.location.href;
     const shareData: ShareData = {
       title: "Giuseppe - Risultati confronto",
       text: shareText,
       url,
     };
-
-    setFeedback(null);
 
     if (typeof navigator.share === "function") {
       try {
@@ -160,47 +93,130 @@ export function ShareResultsButton({
 
     try {
       await navigator.clipboard.writeText(`${shareText}\n${url}`);
-      setFeedback("Link copiato");
-      window.setTimeout(() => setFeedback(null), 2000);
+      showFeedback("Link copiato");
     } catch {
-      setFeedback("Condivisione non disponibile");
-      window.setTimeout(() => setFeedback(null), 2500);
+      showFeedback("Condivisione non disponibile", 2500);
     }
   };
 
-  return (
-    <button type="button" onClick={() => void handleShare()} className={className}>
-      {feedback ?? "Condividi"}
-    </button>
-  );
-}
-
-export function CopyInfoButton({
-  className = buttonClassName,
-  infoText,
-}: {
-  className?: string;
-  infoText: string;
-}) {
-  const [feedback, setFeedback] = useState<string | null>(null);
-
   const handleCopy = async () => {
+    if (!exportDocument) return;
+    setMenuOpen(false);
     setFeedback(null);
 
     try {
-      await navigator.clipboard.writeText(infoText);
-      setFeedback("Info copiate");
-      window.setTimeout(() => setFeedback(null), 2000);
+      await navigator.clipboard.writeText(exportDocumentToText(exportDocument));
+      showFeedback("Info copiate");
     } catch {
-      setFeedback("Copia non disponibile");
-      window.setTimeout(() => setFeedback(null), 2500);
+      showFeedback("Copia non disponibile", 2500);
     }
   };
 
+  const handleDownloadPdf = async () => {
+    if (!chatId || !exportDocument) return;
+    setMenuOpen(false);
+    setFeedback(null);
+    setIsDownloading(true);
+
+    try {
+      const response = await fetch(`/api/chat/${chatId}/export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ format: "pdf", document: exportDocument }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(payload?.error ?? "Download non disponibile");
+      }
+
+      const blob = await response.blob();
+      const disposition = response.headers.get("Content-Disposition");
+      const matchedName = disposition?.match(/filename="([^"]+)"/)?.[1];
+      const filename =
+        matchedName ?? buildScenarioExportFilename(exportDocument, "pdf");
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = window.document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = filename;
+      window.document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(objectUrl);
+      showFeedback("PDF scaricato");
+    } catch (error) {
+      showFeedback(
+        error instanceof Error ? error.message : "Download non disponibile",
+        2500
+      );
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  if (!hasExportMenu) {
+    return (
+      <button type="button" onClick={() => void handleShare()} className={className}>
+        {feedback ?? "Condividi"}
+      </button>
+    );
+  }
+
   return (
-    <button type="button" onClick={() => void handleCopy()} className={className}>
-      {feedback ?? "Copia info"}
-    </button>
+    <div ref={rootRef} className="relative w-fit">
+      <button
+        type="button"
+        onClick={() => setMenuOpen((open) => !open)}
+        disabled={isDownloading}
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        className={`${className} inline-flex items-center gap-1.5`}
+      >
+        {feedback ?? (isDownloading ? "Download..." : "Condividi")}
+        <ChevronDown
+          className={`h-3.5 w-3.5 transition-transform ${menuOpen ? "rotate-180" : ""}`}
+          aria-hidden="true"
+        />
+      </button>
+
+      {menuOpen ? (
+        <div
+          role="menu"
+          className="absolute left-0 z-40 mt-1.5 min-w-46 overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => void handleShare()}
+            className={menuItemClassName}
+          >
+            <Share2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            Condividi link
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => void handleCopy()}
+            className={menuItemClassName}
+          >
+            <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            Copia testo
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => void handleDownloadPdf()}
+            disabled={isDownloading}
+            className={menuItemClassName}
+          >
+            <FileDown className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            Scarica PDF
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -259,29 +275,32 @@ export function RichiestaSummary({
 }
 
 export function ChatShareActions({
+  chatId,
   scenario,
   catalogById,
   tiersByEcommerce,
   prodottiRichiesti,
 }: {
+  chatId: string;
   scenario: ScenarioCarrello;
   catalogById: Record<string, TabellaEcommerce>;
   tiersByEcommerce: Record<string, ShippingTier[]>;
   prodottiRichiesti: string[];
 }) {
   const shareText = buildMatchShareText(scenario);
-  const infoText = buildScenarioInfoText(
+  const exportDocument = buildScenarioExportDocument(
     scenario,
     catalogById,
     tiersByEcommerce,
-    typeof window !== "undefined" ? window.location.href : undefined,
-    prodottiRichiesti
+    prodottiRichiesti,
+    typeof window !== "undefined" ? window.location.href : undefined
   );
 
   return (
-    <>
-      <ShareResultsButton shareText={shareText} />
-      <CopyInfoButton infoText={infoText} />
-    </>
+    <ShareResultsButton
+      shareText={shareText}
+      chatId={chatId}
+      exportDocument={exportDocument}
+    />
   );
 }

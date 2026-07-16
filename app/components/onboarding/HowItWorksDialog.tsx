@@ -692,7 +692,7 @@ function SlideBestOfferDemo({
     <div className="overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800">
       <header className="flex flex-wrap items-start justify-between gap-3 bg-zinc-900 px-4 py-3 sm:px-5 sm:py-4 dark:bg-zinc-950">
         <div className="min-w-0">
-          <h3 className="text-lg font-bold text-white">💸Risparmio assoluto</h3>
+          <h3 className="text-lg font-bold text-white">💸Miglior soluzione</h3>
           <p className="mt-1 text-xs text-zinc-400">
             {formatScenarioSummary(
               copertura,

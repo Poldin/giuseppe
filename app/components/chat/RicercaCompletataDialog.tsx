@@ -93,7 +93,7 @@ export function RicercaCompletataDialog({
                   id="ricerca-completata-dialog-title"
                   className="text-3xl font-semibold text-zinc-900 dark:text-zinc-100"
                 >
-                  risparmio assoluto{" "}
+                  Miglior soluzione{" "}
                   <span className="tabular-nums">
                     <span aria-hidden="true">💸</span>
                     {formatPrice(prezzoTotale)}
