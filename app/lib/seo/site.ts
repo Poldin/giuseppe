@@ -1,5 +1,5 @@
 /** Canonical public site — used by metadata, robots, sitemap, JSON-LD. */
-export const SITE_URL = "https://giuseppeacquisti.it";
+export const SITE_URL = "https://www.giuseppeacquisti.it";
 export const SITE_NAME = "Giuseppe";
 export const SITE_EMAIL = "info@giuseppeacquisti.it";
 
