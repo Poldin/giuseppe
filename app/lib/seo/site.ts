@@ -53,6 +53,43 @@ export const HOW_IT_WORKS_STEPS = [
   },
 ] as const;
 
+/** FAQ homepage — stesso testo visibile agli utenti e nel JSON-LD FAQPage. */
+export const FAQ_ITEMS = [
+  {
+    question: "Cos’è Giuseppe?",
+    answer:
+      "Giuseppe è un servizio gratuito di confronto prezzi e prodotti per studi dentistici. Indichi i materiali e i consumabili che ti servono e Giuseppe confronta le offerte sui principali ecommerce dentali, aiutandoti a scegliere la combinazione migliore. L’acquisto avviene direttamente presso i rivenditori.",
+  },
+  {
+    question: "Quali ecommerce confronta oggi Giuseppe?",
+    answer:
+      "Ad oggi Giuseppe confronta prodotti da Gerhò, Dontalia e Dentaltix, su un catalogo di oltre 100.000 articoli disponibili.",
+  },
+  {
+    question: "Giuseppe è gratis?",
+    answer: "Sì. Giuseppe è un servizio gratuito per gli studi dentistici.",
+  },
+  {
+    question: "Come funziona il confronto?",
+    answer:
+      "1) Indichi la lista dei prodotti che ti servono in studio. 2) Giuseppe ricerca sui principali rivenditori e ti mostra le migliori offerte. 3) Selezioni i prodotti migliori per ogni esigenza e componi l’ordine migliore. 4) Acquisti in tutta sicurezza direttamente dai rivenditori.",
+  },
+  {
+    question: "Quanto tempo ci vuole per una comparazione?",
+    answer:
+      "Il tempo medio di comparazione va dai 2,3 ai 4,9 secondi. Giuseppe riceve dalle 500 alle 2.000 richieste giornaliere di comparazione.",
+  },
+  {
+    question: "Giuseppe vende i prodotti?",
+    answer:
+      "No: Giuseppe confronta e ti porta ai rivenditori; non vende e non gestisce il pagamento.",
+  },
+  {
+    question: "Come posso contattarvi?",
+    answer: "Puoi scriverci a info@giuseppeacquisti.it.",
+  },
+] as const;
+
 /** Structured data for AI / search engines (homepage). */
 export function getHomeJsonLd() {
   return {
@@ -125,6 +162,18 @@ export function getHomeJsonLd() {
           position: index + 1,
           name: step.title,
           text: step.description,
+        })),
+      },
+      {
+        "@type": "FAQPage",
+        "@id": `${SITE_URL}/#faq`,
+        mainEntity: FAQ_ITEMS.map((item) => ({
+          "@type": "Question",
+          name: item.question,
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: item.answer,
+          },
         })),
       },
     ],

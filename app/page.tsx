@@ -1,5 +1,6 @@
 import HomeSearchBox from "@/app/components/home/HomeSearchBox";
 import { HomeEcommerceBadges } from "@/app/components/home/HomeEcommerceBadges";
+import { HomeFaq } from "@/app/components/home/HomeFaq";
 import { HowItWorksButton } from "@/app/components/onboarding/HowItWorksButton";
 import { fetchRecentPublicSearches } from "@/app/lib/search/chat-store";
 import { fetchEcommerceCatalog } from "@/app/lib/search/match-products";
@@ -165,6 +166,8 @@ export default async function Home() {
             </p>
           </div>
         </section>
+
+        <HomeFaq />
       </main>
     </div>
   );
