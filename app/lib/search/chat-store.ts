@@ -62,6 +62,53 @@ export async function saveProductSearchChat(input: {
   return data.id;
 }
 
+export type RecentPublicSearch = {
+  id: string;
+  created_at: string;
+  query_text: string;
+  products: string[];
+};
+
+export async function fetchRecentPublicSearches(
+  limit = 15
+): Promise<RecentPublicSearch[]> {
+  const { data, error } = await supabase
+    .from("product_search_chats")
+    .select("id, created_at, query_text, products")
+    .order("created_at", { ascending: false })
+    .limit(limit * 2);
+
+  if (error || !data) {
+    console.error("fetchRecentPublicSearches failed:", error);
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const results: RecentPublicSearch[] = [];
+
+  for (const row of data) {
+    const products = Array.isArray(row.products)
+      ? row.products.filter((item): item is string => typeof item === "string")
+      : [];
+    if (products.length === 0) continue;
+
+    const key = products.map((p) => p.toLowerCase()).join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    results.push({
+      id: row.id,
+      created_at: row.created_at,
+      query_text: row.query_text,
+      products,
+    });
+
+    if (results.length >= limit) break;
+  }
+
+  return results;
+}
+
 export async function updateProductSearchChat(
   id: string,
   input: {

@@ -1,138 +1,24 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Loader2, X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { ProductSearchCombobox } from "@/app/components/home/ProductSearchCombobox";
+import { RecentSearchesStrip } from "@/app/components/home/RecentSearchesStrip";
+import type { RecentPublicSearch } from "@/app/lib/search/chat-store";
 
-const SUGGESTED_PRODUCTS = [
-  "guanti in nitrile",
-  "guanti in lattice",
-  "mascherine chirurgiche",
-  "rulli di cotone",
-  "aspirasaliva",
-  "bicchieri monouso",
-  "bavagli",
-  "vassoi monouso",
-  "telini",
-  "garze sterili",
-  "aghi per anestesia",
-  "tubofustelle",
-  "pellicole protettive",
-  "composito dentale",
-  "silicone per impronte",
-  "alginato",
-  "cemento dentale",
-  "adesivo dentale",
-  "mordenzante",
-  "resina acrilica",
-  "matrici sezionali",
-  "perni endocanalari",
-  "gesso odontoiatrico",
-  "cera odontoiatrica",
-  "frese diamantate",
-  "frese in carburo",
-  "file endodontici",
-  "manipoli odontoiatrici",
-  "turbine dentali",
-  "contrangoli",
-  "ablatori ultrasuoni",
-  "specchietti dentali",
-  "pinze odontoiatriche",
-  "leve per estrazione",
-  "siringhe aria acqua",
-  "autoclave",
-  "buste per sterilizzazione",
-  "rotoli sterilizzazione",
-  "disinfettante superfici",
-  "disinfettante strumenti",
-  "vasca ultrasuoni",
-  "test sterilizzazione",
-  "detergente ferri",
-  "riunito dentale",
-  "scanner intraorale",
-  "radiografico endorale",
-  "sensore rvg",
-  "lampada fotopolimerizzatrice",
-  "localizzatore d'apice",
-  "motore endodontico",
-  "motore implantologia",
-  "telecamera intraorale",
-  "bracket ortodontici",
-  "fili ortodontici",
-  "archi ortodontici",
-  "impianti dentali",
-  "monconi implantari",
-  "suture chirurgiche",
-  "osso sintetico",
-  "membrane riassorbibili",
-] as const;
+const MAX_PRODUCTS = 20;
 
-function isProductSelected(selectedProducts: string[], name: string) {
-  return selectedProducts.some(
-    (item) => item.toLowerCase() === name.toLowerCase()
-  );
-}
-
-export default function HomeSearchBox() {
+export default function HomeSearchBox({
+  recentSearches = [],
+}: {
+  recentSearches?: RecentPublicSearch[];
+}) {
   const router = useRouter();
-  const scrollRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-
-  const updateScrollState = useCallback(() => {
-    const element = scrollRef.current;
-    if (!element) return;
-
-    const maxScroll = element.scrollWidth - element.clientWidth;
-    setCanScrollLeft(element.scrollLeft > 4);
-    setCanScrollRight(element.scrollLeft < maxScroll - 4);
-  }, []);
-
-  useEffect(() => {
-    const element = scrollRef.current;
-    if (!element) return;
-
-    updateScrollState();
-    element.addEventListener("scroll", updateScrollState, { passive: true });
-
-    const resizeObserver = new ResizeObserver(updateScrollState);
-    resizeObserver.observe(element);
-
-    return () => {
-      element.removeEventListener("scroll", updateScrollState);
-      resizeObserver.disconnect();
-    };
-  }, [updateScrollState]);
-
-  const getScrollStep = (element: HTMLDivElement) => {
-    const track = element.firstElementChild;
-    if (!track) return 200;
-
-    const chips = track.querySelectorAll<HTMLElement>("[data-suggestion-chip]");
-    if (chips.length >= 2) {
-      return chips[1].offsetLeft - chips[0].offsetLeft;
-    }
-    if (chips.length === 1) {
-      return chips[0].offsetWidth + 8;
-    }
-    return 200;
-  };
-
-  const scrollStrip = (direction: "left" | "right") => {
-    const element = scrollRef.current;
-    if (!element) return;
-
-    const amount = getScrollStep(element);
-    element.scrollBy({
-      left: direction === "left" ? -amount : amount,
-      behavior: "smooth",
-    });
-  };
 
   const addProduct = useCallback((name: string) => {
     const trimmed = name.trim();
@@ -142,8 +28,30 @@ export default function HomeSearchBox() {
       const exists = current.some(
         (item) => item.toLowerCase() === trimmed.toLowerCase()
       );
-      if (exists) return current;
+      if (exists || current.length >= MAX_PRODUCTS) return current;
       return [...current, trimmed];
+    });
+    setQuery("");
+    setError(null);
+  }, []);
+
+  const addProductsFromSearch = useCallback((products: string[]) => {
+    setSelectedProducts((current) => {
+      const next = [...current];
+
+      for (const name of products) {
+        const trimmed = name.trim();
+        if (!trimmed) continue;
+
+        const exists = next.some(
+          (item) => item.toLowerCase() === trimmed.toLowerCase()
+        );
+        if (exists || next.length >= MAX_PRODUCTS) continue;
+
+        next.push(trimmed);
+      }
+
+      return next;
     });
     setQuery("");
     setError(null);
@@ -155,13 +63,10 @@ export default function HomeSearchBox() {
     );
   }, []);
 
-  const toggleSuggestion = (name: string) => {
-    if (isProductSelected(selectedProducts, name)) {
-      removeProduct(name);
-    } else {
-      addProduct(name);
-    }
-  };
+  const clearAllProducts = useCallback(() => {
+    setSelectedProducts([]);
+    setError(null);
+  }, []);
 
   const handleSubmitList = async () => {
     if (selectedProducts.length === 0 || isSubmitting) return;
@@ -206,7 +111,6 @@ export default function HomeSearchBox() {
   };
 
   const canSubmitList = selectedProducts.length > 0 && !isSubmitting;
-  const showScrollControls = canScrollLeft || canScrollRight;
 
   return (
     <div className="w-full max-w-lg text-left">
@@ -221,64 +125,11 @@ export default function HomeSearchBox() {
         placeholder="Cerca un prodotto alla volta..."
       />
 
-      <div className="mt-4">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-            potrebbero servirti
-          </p>
-          {showScrollControls ? (
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => scrollStrip("left")}
-                disabled={!canScrollLeft}
-                aria-label="Scorri suggerimenti a sinistra"
-                className="rounded-md p-1 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollStrip("right")}
-                disabled={!canScrollRight}
-                aria-label="Scorri suggerimenti a destra"
-                className="rounded-md p-1 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          ) : null}
-        </div>
-
-        <div
-          ref={scrollRef}
-          className="-mx-4 min-w-0 overflow-x-auto px-4 pb-1 scrollbar-none touch-pan-x sm:-mx-1 sm:px-1"
-        >
-          <div className="flex w-max gap-2">
-            {SUGGESTED_PRODUCTS.map((name) => {
-              const selected = isProductSelected(selectedProducts, name);
-
-              return (
-                <button
-                  key={name}
-                  type="button"
-                  data-suggestion-chip
-                  onClick={() => toggleSuggestion(name)}
-                  disabled={isSubmitting}
-                  aria-pressed={selected}
-                  className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
-                    selected
-                      ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-950"
-                      : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:bg-zinc-800"
-                  }`}
-                >
-                  {name}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+      <RecentSearchesStrip
+        searches={recentSearches}
+        onSelectSearch={addProductsFromSearch}
+        disabled={isSubmitting}
+      />
 
       <button
         type="button"
@@ -297,9 +148,21 @@ export default function HomeSearchBox() {
       </button>
 
       <div className="mt-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-          La tua ricerca ({selectedProducts.length})
-        </p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            La tua ricerca ({selectedProducts.length})
+          </p>
+          {selectedProducts.length > 0 ? (
+            <button
+              type="button"
+              onClick={clearAllProducts}
+              disabled={isSubmitting}
+              className="text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-zinc-200"
+            >
+              Elimina tutto
+            </button>
+          ) : null}
+        </div>
         {!canSubmitList && !isSubmitting ? (
           <p className="mt-5 text-xs text-center text-zinc-500">
             puoi aggiungere fino a <span className="font-extrabold">20 prodotti</span> per ricerca

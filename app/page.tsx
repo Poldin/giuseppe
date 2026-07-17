@@ -1,6 +1,7 @@
 import HomeSearchBox from "@/app/components/home/HomeSearchBox";
 import { HomeEcommerceBadges } from "@/app/components/home/HomeEcommerceBadges";
 import { HowItWorksButton } from "@/app/components/onboarding/HowItWorksButton";
+import { fetchRecentPublicSearches } from "@/app/lib/search/chat-store";
 import { fetchEcommerceCatalog } from "@/app/lib/search/match-products";
 import Image from "next/image";
 
@@ -85,7 +86,10 @@ const STEPS = [
 ];
 
 export default async function Home() {
-  const ecommerces = await fetchEcommerceCatalog();
+  const [ecommerces, recentSearches] = await Promise.all([
+    fetchEcommerceCatalog(),
+    fetchRecentPublicSearches(),
+  ]);
   const yesterdayStats = getYesterdaySearchStats();
 
   return (
@@ -130,7 +134,7 @@ export default async function Home() {
             </p>
           </div>
           <div className="mt-10">
-            <HomeSearchBox />
+            <HomeSearchBox recentSearches={recentSearches} />
           </div>
         </section>
 
