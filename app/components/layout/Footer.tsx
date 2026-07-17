@@ -41,6 +41,13 @@ export function Footer() {
               Aiutaci a migliorare
             </button>
           </nav>
+
+          <a
+            href="mailto:info@giuseppeacquisti.it"
+            className="text-sm text-zinc-500 transition-colors hover:text-zinc-900 dark:text-zinc-500 dark:hover:text-zinc-100"
+          >
+            info@giuseppeacquisti.it
+          </a>
         </div>
       </footer>
 
