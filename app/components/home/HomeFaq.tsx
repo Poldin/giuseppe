@@ -1,10 +1,10 @@
 "use client";
 
-import { FAQ_ITEMS } from "@/app/lib/seo/site";
+import type { FaqItem } from "@/app/lib/seo/site";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
-export function HomeFaq() {
+export function HomeFaq({ items }: { items: FaqItem[] }) {
   const [openIndex, setOpenIndex] = useState(0);
 
   return (
@@ -20,7 +20,7 @@ export function HomeFaq() {
         FAQ
       </h2>
       <div className="divide-y divide-zinc-100 dark:divide-zinc-900">
-        {FAQ_ITEMS.map((item, index) => {
+        {items.map((item, index) => {
           const isOpen = openIndex === index;
           const panelId = `faq-panel-${index}`;
           const buttonId = `faq-button-${index}`;

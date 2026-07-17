@@ -5,9 +5,10 @@ import { HowItWorksButton } from "@/app/components/onboarding/HowItWorksButton";
 import { fetchRecentPublicSearches } from "@/app/lib/search/chat-store";
 import { fetchEcommerceCatalog } from "@/app/lib/search/match-products";
 import {
+  getFaqItems,
   getHomeJsonLd,
+  getPriceTransparency,
   HOW_IT_WORKS_STEPS,
-  PRICE_TRANSPARENCY,
 } from "@/app/lib/seo/site";
 import Image from "next/image";
 
@@ -65,7 +66,10 @@ function getYesterdaySearchStats(now = new Date()) {
   };
 }
 
-/** Aggiorna almeno ogni ora così “ieri” e il conteggio ruotano dopo mezzanotte. */
+/**
+ * Aggiorna almeno ogni ora così “ieri”, il conteggio e la data
+ * di ultimo aggiornamento catalogo (soglia 12:00 Europe/Rome) restano coerenti.
+ */
 export const revalidate = 3600;
 
 export default async function Home() {
@@ -74,7 +78,8 @@ export default async function Home() {
     fetchRecentPublicSearches(),
   ]);
   const yesterdayStats = getYesterdaySearchStats();
-
+  const priceTransparency = getPriceTransparency();
+  const faqItems = getFaqItems();
   const jsonLd = getHomeJsonLd();
 
   return (
@@ -184,11 +189,11 @@ export default async function Home() {
             Trasparenza sui prezzi
           </h2>
           <p className="leading-relaxed text-zinc-600 dark:text-zinc-400">
-            {PRICE_TRANSPARENCY}
+            {priceTransparency}
           </p>
         </section>
 
-        <HomeFaq />
+        <HomeFaq items={faqItems} />
       </main>
     </div>
   );

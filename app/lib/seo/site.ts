@@ -6,12 +6,66 @@ export const SITE_EMAIL = "info@giuseppeacquisti.it";
 /** Ecommerce attualmente confrontati. */
 export const COMPARED_ECOMMERCES = ["Gerhò", "Dontalia", "Dentaltix"] as const;
 
+const MONTHS_IT = [
+  "gennaio",
+  "febbraio",
+  "marzo",
+  "aprile",
+  "maggio",
+  "giugno",
+  "luglio",
+  "agosto",
+  "settembre",
+  "ottobre",
+  "novembre",
+  "dicembre",
+] as const;
+
+/** Data/ora di calendario in Europe/Rome. */
+function getRomeDateTime(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Rome",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const num = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((p) => p.type === type)?.value);
+  return {
+    year: num("year"),
+    month: num("month"),
+    day: num("day"),
+    hour: num("hour"),
+  };
+}
+
+/**
+ * Ultimo aggiornamento catalogo (Europe/Rome):
+ * dalle 12:00 in poi → oggi; prima delle 12:00 → ieri.
+ */
+export function getLastCatalogUpdateLabel(now = new Date()): string {
+  const rome = getRomeDateTime(now);
+  const base = new Date(Date.UTC(rome.year, rome.month - 1, rome.day));
+  if (rome.hour < 12) {
+    base.setUTCDate(base.getUTCDate() - 1);
+  }
+
+  const year = base.getUTCFullYear();
+  const month = base.getUTCMonth() + 1;
+  const day = base.getUTCDate();
+  return `${day} ${MONTHS_IT[month - 1]} ${year}`;
+}
+
 /**
  * Trasparenza su freschezza dati e IVA — stesso testo in home, FAQ e JSON-LD.
  * Nessun riferimento a scraping o termini tecnici di raccolta dati.
  */
-export const PRICE_TRANSPARENCY =
-  "I prezzi e i prodotti mostrati si basano su un catalogo aggiornato quotidianamente da Gerhò, Dontalia e Dentaltix. Il confronto usa dati di catalogo aggiornati ogni giorno; il prezzo finale e l’IVA vanno sempre verificati sul sito del rivenditore al momento dell’acquisto.";
+export function getPriceTransparency(now = new Date()): string {
+  const lastUpdate = getLastCatalogUpdateLabel(now);
+  return `I prezzi e i prodotti mostrati si basano su un catalogo aggiornato quotidianamente da Gerhò, Dontalia e Dentaltix. Ultimo aggiornamento del catalogo: ${lastUpdate}. Il confronto usa dati di catalogo aggiornati ogni giorno; il prezzo finale e l’IVA vanno sempre verificati sul sito del rivenditore al momento dell’acquisto.`;
+}
 
 /**
  * Descrizione del servizio per crawler e AI.
@@ -60,49 +114,62 @@ export const HOW_IT_WORKS_STEPS = [
   },
 ] as const;
 
+export type FaqItem = {
+  question: string;
+  answer: string;
+};
+
 /** FAQ homepage — stesso testo visibile agli utenti e nel JSON-LD FAQPage. */
-export const FAQ_ITEMS = [
-  {
-    question: "Cos’è Giuseppe?",
-    answer:
-      "Giuseppe è un servizio gratuito di confronto prezzi e prodotti per studi dentistici. Indichi i materiali e i consumabili che ti servono e Giuseppe confronta le offerte sui principali ecommerce dentali, aiutandoti a scegliere la combinazione migliore. L’acquisto avviene direttamente presso i rivenditori.",
-  },
-  {
-    question: "Quali ecommerce confronta oggi Giuseppe?",
-    answer:
-      "Ad oggi Giuseppe confronta prodotti da Gerhò, Dontalia e Dentaltix, su un catalogo di oltre 100.000 articoli disponibili.",
-  },
-  {
-    question: "I prezzi sono aggiornati? Includono l’IVA?",
-    answer: PRICE_TRANSPARENCY,
-  },
-  {
-    question: "Giuseppe è gratis?",
-    answer: "Sì. Giuseppe è un servizio gratuito per gli studi dentistici.",
-  },
-  {
-    question: "Come funziona il confronto?",
-    answer:
-      "1) Indichi la lista dei prodotti che ti servono in studio. 2) Giuseppe ricerca sui principali rivenditori e ti mostra le migliori offerte. 3) Selezioni i prodotti migliori per ogni esigenza e componi l’ordine migliore. 4) Acquisti in tutta sicurezza direttamente dai rivenditori.",
-  },
-  {
-    question: "Quanto tempo ci vuole per una comparazione?",
-    answer:
-      "Il tempo medio di comparazione va dai 2,3 ai 4,9 secondi. Giuseppe riceve dalle 500 alle 2.000 richieste giornaliere di comparazione.",
-  },
-  {
-    question: "Giuseppe vende i prodotti?",
-    answer:
-      "No: Giuseppe confronta e ti porta ai rivenditori; non vende e non gestisce il pagamento.",
-  },
-  {
-    question: "Come posso contattarvi?",
-    answer: "Puoi scriverci a info@giuseppeacquisti.it.",
-  },
-] as const;
+export function getFaqItems(now = new Date()): FaqItem[] {
+  const priceTransparency = getPriceTransparency(now);
+
+  return [
+    {
+      question: "Cos’è Giuseppe?",
+      answer:
+        "Giuseppe è un servizio gratuito di confronto prezzi e prodotti per studi dentistici. Indichi i materiali e i consumabili che ti servono e Giuseppe confronta le offerte sui principali ecommerce dentali, aiutandoti a scegliere la combinazione migliore. L’acquisto avviene direttamente presso i rivenditori.",
+    },
+    {
+      question: "Quali ecommerce confronta oggi Giuseppe?",
+      answer:
+        "Ad oggi Giuseppe confronta prodotti da Gerhò, Dontalia e Dentaltix, su un catalogo di oltre 100.000 articoli disponibili.",
+    },
+    {
+      question: "I prezzi sono aggiornati? Includono l’IVA?",
+      answer: priceTransparency,
+    },
+    {
+      question: "Giuseppe è gratis?",
+      answer: "Sì. Giuseppe è un servizio gratuito per gli studi dentistici.",
+    },
+    {
+      question: "Come funziona il confronto?",
+      answer:
+        "1) Indichi la lista dei prodotti che ti servono in studio. 2) Giuseppe ricerca sui principali rivenditori e ti mostra le migliori offerte. 3) Selezioni i prodotti migliori per ogni esigenza e componi l’ordine migliore. 4) Acquisti in tutta sicurezza direttamente dai rivenditori.",
+    },
+    {
+      question: "Quanto tempo ci vuole per una comparazione?",
+      answer:
+        "Il tempo medio di comparazione va dai 2,3 ai 4,9 secondi. Giuseppe riceve dalle 500 alle 2.000 richieste giornaliere di comparazione.",
+    },
+    {
+      question: "Giuseppe vende i prodotti?",
+      answer:
+        "No: Giuseppe confronta e ti porta ai rivenditori; non vende e non gestisce il pagamento.",
+    },
+    {
+      question: "Come posso contattarvi?",
+      answer: "Puoi scriverci a info@giuseppeacquisti.it.",
+    },
+  ];
+}
 
 /** Structured data for AI / search engines (homepage). */
-export function getHomeJsonLd() {
+export function getHomeJsonLd(now = new Date()) {
+  const priceTransparency = getPriceTransparency(now);
+  const lastUpdate = getLastCatalogUpdateLabel(now);
+  const faqItems = getFaqItems(now);
+
   return {
     "@context": "https://schema.org",
     "@graph": [
@@ -139,7 +206,7 @@ export function getHomeJsonLd() {
         operatingSystem: "Web",
         inLanguage: "it-IT",
         isAccessibleForFree: true,
-        description: SITE_DESCRIPTION,
+        description: `${SITE_DESCRIPTION} Ultimo aggiornamento del catalogo: ${lastUpdate}.`,
         audience: {
           "@type": "Audience",
           audienceType: "Studi dentistici",
@@ -154,6 +221,8 @@ export function getHomeJsonLd() {
           "Confronto prezzi su oltre 100.000 articoli dentali",
           `Ad oggi confronta prodotti da ${COMPARED_ECOMMERCES.join(", ")}`,
           "Catalogo aggiornato quotidianamente",
+          `Ultimo aggiornamento del catalogo: ${lastUpdate}`,
+          priceTransparency,
           "Prezzo finale e IVA da verificare sul sito del rivenditore all’acquisto",
           "Dalle 500 alle 2.000 richieste giornaliere di comparazione",
           "Tempo medio di comparazione tra 2,3 e 4,9 secondi",
@@ -180,7 +249,7 @@ export function getHomeJsonLd() {
       {
         "@type": "FAQPage",
         "@id": `${SITE_URL}/#faq`,
-        mainEntity: FAQ_ITEMS.map((item) => ({
+        mainEntity: faqItems.map((item) => ({
           "@type": "Question",
           name: item.question,
           acceptedAnswer: {
