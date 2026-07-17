@@ -3,6 +3,7 @@ import { HomeEcommerceBadges } from "@/app/components/home/HomeEcommerceBadges";
 import { HowItWorksButton } from "@/app/components/onboarding/HowItWorksButton";
 import { fetchRecentPublicSearches } from "@/app/lib/search/chat-store";
 import { fetchEcommerceCatalog } from "@/app/lib/search/match-products";
+import { getHomeJsonLd, HOW_IT_WORKS_STEPS } from "@/app/lib/seo/site";
 import Image from "next/image";
 
 const MONTHS_IT = [
@@ -62,29 +63,6 @@ function getYesterdaySearchStats(now = new Date()) {
 /** Aggiorna almeno ogni ora così “ieri” e il conteggio ruotano dopo mezzanotte. */
 export const revalidate = 3600;
 
-const STEPS = [
-  {
-    title: "Cosa ti serve?",
-    description:
-      "indica la lista dei prodotti che ti servono in Studio.",
-  },
-  {
-    title: "Lasciami comparare prezzi e prodotti",
-    description:
-      "Faccio una ricerca sui principali rivenditori e ti mostro le migliori offerte.",
-  },
-  {
-    title: "Modifica e migliora la ricerca",
-    description:
-      "Seleziona i prodotti migliori per ogni tua esigenza e componi il tuo ordine migliore.",
-  },
-  {
-    title: "Acquista in tutta sicurezza dai rivenditori.",
-    description:
-      "Io ti aiuto a a trovare la migliore combinazione di prodotti e prezzi: acquista in tutta sicurezza dai rivenditori.",
-  },
-];
-
 export default async function Home() {
   const [ecommerces, recentSearches] = await Promise.all([
     fetchEcommerceCatalog(),
@@ -92,8 +70,14 @@ export default async function Home() {
   ]);
   const yesterdayStats = getYesterdaySearchStats();
 
+  const jsonLd = getHomeJsonLd();
+
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <main className="mx-auto max-w-lg px-2 py-2">
         {/* Hero */}
         <section className="flex flex-col gap-3">
@@ -148,7 +132,7 @@ export default async function Home() {
           </h2>
 
           <ol className="flex flex-col gap-8">
-            {STEPS.map((step, index) => (
+            {HOW_IT_WORKS_STEPS.map((step, index) => (
               <li key={step.title} className="flex gap-4">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-sm font-bold text-white dark:bg-zinc-100 dark:text-zinc-950">
                   {index + 1}

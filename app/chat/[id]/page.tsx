@@ -7,6 +7,19 @@ import { HowItWorksButton } from "@/app/components/onboarding/HowItWorksButton";
 import { getProductSearchChat } from "@/app/lib/search/chat-store";
 import type { RisultatoConfronto } from "@/app/lib/search/elabora-scenari";
 import type { ProductSearchResult } from "@/app/lib/search/types";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: {
+      index: false,
+      follow: false,
+      noimageindex: true,
+    },
+  },
+};
 
 type ChatPageProps = {
   params: Promise<{ id: string }>;
