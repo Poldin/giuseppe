@@ -4,7 +4,11 @@ import { HomeFaq } from "@/app/components/home/HomeFaq";
 import { HowItWorksButton } from "@/app/components/onboarding/HowItWorksButton";
 import { fetchRecentPublicSearches } from "@/app/lib/search/chat-store";
 import { fetchEcommerceCatalog } from "@/app/lib/search/match-products";
-import { getHomeJsonLd, HOW_IT_WORKS_STEPS } from "@/app/lib/seo/site";
+import {
+  getHomeJsonLd,
+  HOW_IT_WORKS_STEPS,
+  PRICE_TRANSPARENCY,
+} from "@/app/lib/seo/site";
 import Image from "next/image";
 
 const MONTHS_IT = [
@@ -165,6 +169,23 @@ export default async function Home() {
               per gli studi dentistici.
             </p>
           </div>
+        </section>
+
+        {/* Trasparenza prezzi — visibile a utenti e AI */}
+        <section
+          id="trasparenza-prezzi"
+          className="mt-16 scroll-mt-6"
+          aria-labelledby="trasparenza-prezzi-heading"
+        >
+          <h2
+            id="trasparenza-prezzi-heading"
+            className="mb-4 text-2xl font-black uppercase tracking-tighter sm:text-3xl"
+          >
+            Trasparenza sui prezzi
+          </h2>
+          <p className="leading-relaxed text-zinc-600 dark:text-zinc-400">
+            {PRICE_TRANSPARENCY}
+          </p>
         </section>
 
         <HomeFaq />
