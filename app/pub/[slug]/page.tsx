@@ -6,6 +6,7 @@ import {
 } from "@/app/lib/pub/product";
 import { fetchRelatedPubProducts } from "@/app/lib/pub/related";
 import {
+  getPubProductDateModified,
   getPubProductJsonLd,
   getPubProductMetaDescription,
   pubProductAbsoluteUrl,
@@ -38,6 +39,7 @@ export async function generateMetadata({
   const description = getPubProductMetaDescription(product);
   const canonical = pubProductPath(product.pub_slug);
   const absoluteUrl = pubProductAbsoluteUrl(product.pub_slug);
+  const dateModified = getPubProductDateModified(product);
 
   return {
     title,
@@ -46,12 +48,14 @@ export async function generateMetadata({
       canonical,
     },
     openGraph: {
-      type: "website",
+      // Next non espone og:type "product"; article + modifiedTime comunica la freschezza da update_at.
+      type: "article",
       locale: "it_IT",
       url: absoluteUrl,
       siteName: SITE_NAME,
       title,
       description,
+      ...(dateModified ? { modifiedTime: dateModified } : {}),
       images: [
         {
           url: "/giuseppe.jpeg",

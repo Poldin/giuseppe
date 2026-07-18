@@ -202,9 +202,19 @@ export function formatPubPrice(price: number | null): string | null {
   });
 }
 
+/**
+ * Title SEO / browser: nome + prezzo + ecommerce.
+ * Es. "Guanti nitrile M — 12,90 € su Gerhò"
+ * (il layout aggiunge " | Giuseppe")
+ */
 export function pubProductDisplayTitle(product: PubProduct): string {
-  if (product.brand) {
-    return `${product.brand} — ${product.product_name}`;
-  }
+  const shop = product.ecommerce?.name?.trim() || null;
+  const price = !product.is_escluded
+    ? formatPubPrice(product.final_price)
+    : null;
+
+  if (price && shop) return `${product.product_name} — ${price} su ${shop}`;
+  if (price) return `${product.product_name} — ${price}`;
+  if (shop) return `${product.product_name} su ${shop}`;
   return product.product_name;
 }

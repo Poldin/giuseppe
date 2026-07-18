@@ -1,9 +1,10 @@
 import { PubProductActions } from "@/app/components/pub/PubProductActions";
+import { PubProductFaq } from "@/app/components/pub/PubProductFaq";
 import { PubRelatedProducts } from "@/app/components/pub/PubRelatedProducts";
 import type { PubProduct } from "@/app/lib/pub/product";
 import { formatPubPrice } from "@/app/lib/pub/product";
 import type { RelatedPubProduct } from "@/app/lib/pub/related";
-import { getPriceTransparency } from "@/app/lib/seo/site";
+import { getPubProductFaqItems } from "@/app/lib/seo/pub-product";
 import Link from "next/link";
 
 function ecommerceHref(domain: string | null): string | null {
@@ -24,7 +25,7 @@ export function PubProductView({
   const shop = product.ecommerce;
   const shopHref = shop ? ecommerceHref(shop.domain) : null;
   const productUrl = product.original_url?.trim() || null;
-  const priceTransparency = getPriceTransparency();
+  const faqItems = getPubProductFaqItems(product);
 
   const ecommerceBadgeClassName =
     "inline-flex h-7 w-fit max-w-full items-center rounded-md bg-white px-2.5 py-1 ring-1 ring-zinc-100 dark:ring-zinc-800";
@@ -134,20 +135,7 @@ export function PubProductView({
           products={relatedProducts}
         />
 
-        <section
-          className="mt-14 border-t border-zinc-100 pt-8 dark:border-zinc-900"
-          aria-labelledby="trasparenza-prezzo-heading"
-        >
-          <h2
-            id="trasparenza-prezzo-heading"
-            className="mb-3 text-lg font-black uppercase tracking-tighter"
-          >
-            Trasparenza sui prezzi
-          </h2>
-          <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-            {priceTransparency}
-          </p>
-        </section>
+        <PubProductFaq items={faqItems} />
       </main>
     </div>
   );
