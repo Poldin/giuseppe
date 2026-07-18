@@ -70,6 +70,11 @@ export const metadata: Metadata = {
     description: SITE_DESCRIPTION,
     images: ["/giuseppe.jpeg"],
   },
+  verification: {
+    other: {
+      "msvalidate.01": "46CB1C2E0DF66FE1A3134244533FE4CE",
+    },
+  },
 };
 
 export default function RootLayout({
