@@ -142,6 +142,24 @@ CREATE TABLE public.scraped_product (
   id_ecommerce text,
   brand text,
   update_at timestamp with time zone,
-  CONSTRAINT scraped_product_pkey PRIMARY KEY (id),
+  is_escluded boolean,
+  update_session_id text,
+  pub_slug text,
   CONSTRAINT scraped_product_ecommerce_id_fkey FOREIGN KEY (ecommerce_id) REFERENCES public.ecommerce_brand(id)
+);
+CREATE TABLE public.review_giuseppe (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  body text,
+  other jsonb,
+  CONSTRAINT review_giuseppe_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.pub_related_click (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  from_product_id uuid NOT NULL,
+  to_product_id uuid NOT NULL,
+  from_pub_slug text,
+  to_pub_slug text,
+  CONSTRAINT pub_related_click_pkey PRIMARY KEY (id)
 );

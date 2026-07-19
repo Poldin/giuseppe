@@ -102,3 +102,31 @@ def resolve_pages(plan: PagePlan, total_pages: int | None = None) -> list[int]:
         )
 
     return list(range(plan.start_page, total_pages + 1))
+
+
+def page_plan_to_dict(plan: PagePlan) -> dict:
+    return {
+        "mode": plan.mode,
+        "pages": list(plan.pages),
+        "start_page": plan.start_page,
+    }
+
+
+def page_plan_from_dict(data: dict) -> PagePlan:
+    mode = data.get("mode")
+    if mode not in ("range", "list"):
+        raise ValueError(f"page_plan.mode non valido: {mode!r}")
+
+    pages_raw = data.get("pages", [])
+    if not isinstance(pages_raw, list):
+        raise ValueError("page_plan.pages deve essere una lista")
+    pages = [int(page) for page in pages_raw]
+
+    start_page = int(data.get("start_page", 1))
+    if start_page < 1:
+        raise ValueError(f"page_plan.start_page >= 1, ricevuto {start_page}")
+
+    if mode == "list" and not pages:
+        raise ValueError("page_plan in modalità list richiede almeno una pagina")
+
+    return PagePlan(mode=mode, pages=pages, start_page=start_page)

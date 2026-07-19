@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import create_client, Client
 
+from scrape_cli import load_config, parse_config_path, prompt_yes_no, require_interactive_tty
 from scrape_session import prompt_run_mode, prompt_session_id
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
@@ -80,17 +81,6 @@ def log(message: str) -> None:
     ts = datetime.now().strftime("%H:%M:%S")
     safe = message.encode("utf-8", errors="replace").decode("utf-8", errors="replace")
     print(f"[{ts}] {safe}", flush=True)
-
-
-def prompt_yes_no(message: str, *, default: bool = True) -> bool:
-    hint = "Y/n" if default else "y/N"
-    while True:
-        raw = input(f"{message} [{hint}] ").strip().lower()
-        if raw in ("", "y", "yes", "s", "si", "sì"):
-            return True if raw != "" or default else False
-        if raw in ("n", "no"):
-            return False
-        print('Rispondi "y" (sì) o "n" (no).')
 
 
 def prompt_start_page() -> int:
@@ -503,7 +493,39 @@ def run_route(
     log(f"=== Rotta {label} completata ({pages_scraped} pagine con dati) ===")
 
 
-if __name__ == "__main__":
+def run_from_config(config: dict) -> None:
+    routes = config.get("routes")
+    if not isinstance(routes, list) or not routes:
+        raise ValueError("routes deve essere una lista non vuota")
+
+    session_id = str(config.get("session_id", "")).strip()
+    if not session_id:
+        raise ValueError("session_id mancante nella config Dontalia")
+
+    start_page = int(config.get("start_page", 1))
+    if start_page < 1:
+        raise ValueError(f"start_page >= 1, ricevuto {start_page}")
+
+    for index, route_key in enumerate(routes, start=1):
+        if route_key not in ROUTES:
+            raise ValueError(f"rotta Dontalia sconosciuta: {route_key!r}")
+
+        if index > 1:
+            print()
+            print(f"--- Prossima rotta: {ROUTES[route_key]['label']} ---")
+
+        run_route(
+            route_key,
+            session_id=session_id,
+            start_page=start_page,
+        )
+
+    log("=== Scraping Dontalia completato ===")
+
+
+def main(argv: list[str] | None = None) -> None:
+    config_path = parse_config_path(argv)
+
     log("=== Avvio dontalia_local_scraper ===")
     log(f"Supabase URL: {SUPABASE_URL}")
     log(f"Ecommerce ID: {ECOMMERCE_ID}")
@@ -517,15 +539,15 @@ if __name__ == "__main__":
         log(f"Connessione Supabase FALLITA -> {type(e).__name__}: {e}")
         sys.exit(1)
 
-    if not sys.stdin.isatty():
-        print()
-        print("Questo script chiede input interattivo (rotte, pagina di partenza, session ID).")
-        print("Non puoi rispondere dalla scheda Output / Code Runner.")
-        print()
-        print("Apri il Terminale integrato (Ctrl+`) e lancia:")
-        print("  python app/lib/scraping/dontalia_local_scraper.py")
-        print()
-        sys.exit(1)
+    if config_path is not None:
+        try:
+            run_from_config(load_config(config_path))
+        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+            log(f"Config non valida: {exc}")
+            sys.exit(1)
+        return
+
+    require_interactive_tty("python app/lib/scraping/dontalia_local_scraper.py")
 
     print()
     mode = prompt_run_mode()
@@ -575,3 +597,7 @@ if __name__ == "__main__":
         )
 
     log("=== Scraping Dontalia completato ===")
+
+
+if __name__ == "__main__":
+    main()

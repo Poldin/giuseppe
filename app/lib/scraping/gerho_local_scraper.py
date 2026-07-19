@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import time
@@ -11,8 +12,15 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import create_client, Client
 
+from scrape_cli import load_config, parse_config_path, prompt_yes_no, require_interactive_tty
 from scrape_session import prompt_run_mode, prompt_session_id
-from scrape_pages import PagePlan, prompt_page_plan, prompt_total_pages, resolve_pages
+from scrape_pages import (
+    PagePlan,
+    page_plan_from_dict,
+    prompt_page_plan,
+    prompt_total_pages,
+    resolve_pages,
+)
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 load_dotenv(ROOT_DIR / ".env.local")
@@ -51,17 +59,6 @@ def build_catalog_url(base_url: str, page_number: int) -> str:
     if page_number <= 1:
         return base_url
     return f"{base_url}?order={CATALOG_ORDER}&p={page_number}"
-
-
-def prompt_yes_no(message: str, *, default: bool = True) -> bool:
-    hint = "Y/n" if default else "y/N"
-    while True:
-        raw = input(f"{message} [{hint}] ").strip().lower()
-        if raw in ("", "y", "yes", "s", "si", "sì"):
-            return True if raw != "" or default else False
-        if raw in ("n", "no"):
-            return False
-        print('Rispondi "y" (sì) o "n" (no).')
 
 
 def log(message: str) -> None:
@@ -407,7 +404,49 @@ def run_route(
     log(f"=== Rotta {label} completata ===")
 
 
-if __name__ == "__main__":
+def run_from_config(config: dict) -> None:
+    routes = config.get("routes")
+    if not isinstance(routes, list) or not routes:
+        raise ValueError("routes deve essere una lista non vuota")
+
+    session_id = str(config.get("session_id", "")).strip()
+    if not session_id:
+        raise ValueError("session_id mancante nella config Gerhò")
+
+    page_plan = page_plan_from_dict(config["page_plan"])
+    totals_raw = config.get("total_pages_by_route", {})
+    if not isinstance(totals_raw, dict):
+        raise ValueError("total_pages_by_route deve essere un oggetto")
+
+    for index, route_key in enumerate(routes, start=1):
+        if route_key not in ROUTES:
+            raise ValueError(f"rotta Gerhò sconosciuta: {route_key!r}")
+
+        total_pages: int | None = None
+        if page_plan.mode == "range":
+            if route_key not in totals_raw:
+                raise ValueError(
+                    f"total_pages_by_route.{route_key} obbligatorio in modalità range"
+                )
+            total_pages = int(totals_raw[route_key])
+
+        if index > 1:
+            print()
+            print(f"--- Prossima rotta: {ROUTES[route_key]['label']} ---")
+
+        run_route(
+            route_key,
+            session_id=session_id,
+            page_plan=page_plan,
+            total_pages=total_pages,
+        )
+
+    log("=== Scraping Gerhò completato ===")
+
+
+def main(argv: list[str] | None = None) -> None:
+    config_path = parse_config_path(argv)
+
     log("=== Avvio gerho_local_scraper ===")
     log(f"Supabase URL: {SUPABASE_URL}")
     log(f"Ecommerce ID: {ECOMMERCE_ID}")
@@ -421,24 +460,34 @@ if __name__ == "__main__":
         log(f"Connessione Supabase FALLITA -> {type(e).__name__}: {e}")
         sys.exit(1)
 
-    if not sys.stdin.isatty():
-        print()
-        print("Questo script chiede input interattivo (rotte, pagine, session ID).")
-        print("Non puoi rispondere dalla scheda Output / Code Runner.")
-        print()
-        print("Apri il Terminale integrato (Ctrl+`) e lancia:")
-        print("  python app/lib/scraping/gerho_local_scraper.py")
-        print()
-        sys.exit(1)
+    if config_path is not None:
+        try:
+            run_from_config(load_config(config_path))
+        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+            log(f"Config non valida: {exc}")
+            sys.exit(1)
+        return
+
+    require_interactive_tty("python app/lib/scraping/gerho_local_scraper.py")
 
     print()
     mode = prompt_run_mode()
 
     if mode == "direct":
         selected_routes = list(ROUTES.keys())
-        log(f"Modalità diretta: rotte {', '.join(ROUTES[key]['label'] for key in selected_routes)}")
+        log(
+            "Modalità diretta: rotte "
+            f"{', '.join(ROUTES[key]['label'] for key in selected_routes)}"
+        )
         session_id = prompt_session_id(supabase, ECOMMERCE_ID, "Gerhò")
         page_plan = prompt_page_plan()
+        total_pages_by_route: dict[str, int] = {}
+        if page_plan.mode == "range":
+            for route_key in selected_routes:
+                route = ROUTES[route_key]
+                print()
+                print(f"=== Totale pagine rotta {route['label']} ===")
+                total_pages_by_route[route_key] = prompt_total_pages(route["base_url"])
     else:
         print()
         print("Quali rotte Gerhò vuoi eseguire?")
@@ -457,6 +506,7 @@ if __name__ == "__main__":
 
         session_id = None
         page_plan = None
+        total_pages_by_route = {}
 
     for index, route_key in enumerate(selected_routes, start=1):
         if index > 1:
@@ -466,6 +516,11 @@ if __name__ == "__main__":
             route_key,
             session_id=session_id,
             page_plan=page_plan,
+            total_pages=total_pages_by_route.get(route_key),
         )
 
     log("=== Scraping Gerhò completato ===")
+
+
+if __name__ == "__main__":
+    main()
