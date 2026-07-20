@@ -42,3 +42,7 @@ next-env.d.ts
 
 # rust
 /rust/search-engine/target
+
+# scraping runtime logs
+app/lib/scraping/*.log
+app/lib/scraping/_probe*
