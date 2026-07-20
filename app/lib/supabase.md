@@ -145,6 +145,7 @@ CREATE TABLE public.scraped_product (
   is_escluded boolean,
   update_session_id text,
   pub_slug text,
+  CONSTRAINT scraped_product_pkey PRIMARY KEY (id),
   CONSTRAINT scraped_product_ecommerce_id_fkey FOREIGN KEY (ecommerce_id) REFERENCES public.ecommerce_brand(id)
 );
 CREATE TABLE public.review_giuseppe (
@@ -162,4 +163,42 @@ CREATE TABLE public.pub_related_click (
   from_pub_slug text,
   to_pub_slug text,
   CONSTRAINT pub_related_click_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.prices_history (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  last_price_recorded numeric,
+  last_discount_recorded numeric,
+  product_id uuid,
+  CONSTRAINT prices_history_pkey PRIMARY KEY (id),
+  CONSTRAINT prices_history_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.scraped_product(id)
+);
+CREATE TABLE public.compatibility_big_brands (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  brand_name text UNIQUE,
+  other jsonb,
+  CONSTRAINT compatibility_big_brands_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.compatibility_implants (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  line_name text,
+  platform_code text,
+  big_brand_id uuid,
+  other jsonb,
+  CONSTRAINT compatibility_implants_pkey PRIMARY KEY (id),
+  CONSTRAINT compatibility_implants_manufacturer_id_fkey FOREIGN KEY (big_brand_id) REFERENCES public.compatibility_big_brands(id)
+);
+CREATE TABLE public.compatibility_compatible_items (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  platform_id uuid,
+  compatible_manufacturer_name text,
+  product_type_name text,
+  manufacturer_code text,
+  other jsonb,
+  product_specific_name text,
+  CONSTRAINT compatibility_compatible_items_pkey PRIMARY KEY (id),
+  CONSTRAINT compatibility_compatible_items_platform_id_fkey FOREIGN KEY (platform_id) REFERENCES public.compatibility_implants(id)
 );

@@ -37,15 +37,39 @@ function trackRelatedClick(payload: {
 export function PubRelatedProducts({
   fromProductId,
   fromPubSlug,
-  products,
 }: {
   fromProductId: string;
   fromPubSlug: string;
-  products: RelatedPubProduct[];
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [products, setProducts] = useState<RelatedPubProduct[]>([]);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+
+    void fetch(`/api/pub/related?slug=${encodeURIComponent(fromPubSlug)}`, {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) return [];
+        const data = (await response.json()) as { products?: RelatedPubProduct[] };
+        return Array.isArray(data.products) ? data.products : [];
+      })
+      .then((nextProducts) => {
+        if (!cancelled) setProducts(nextProducts);
+      })
+      .catch(() => {
+        if (!cancelled) setProducts([]);
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [fromPubSlug]);
 
   const updateScrollState = useCallback(() => {
     const element = scrollRef.current;

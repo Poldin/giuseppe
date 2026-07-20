@@ -1,4 +1,5 @@
 import { supabase } from "@/app/lib/SupabaseClient";
+import { cache } from "react";
 
 const SUPABASE_PAGE_SIZE = 1000;
 /** URLs per sitemap file (under Google's 50k limit). */
@@ -71,17 +72,17 @@ function parseEcommerce(raw: unknown): PubProductEcommerce | null {
   };
 }
 
-export async function fetchPubProductBySlug(
-  slug: string
-): Promise<PubProduct | null> {
-  const trimmed = slug.trim();
-  if (!trimmed) return null;
+/** Dedup metadata + page nello stesso request. */
+export const fetchPubProductBySlug = cache(
+  async (slug: string): Promise<PubProduct | null> => {
+    const trimmed = slug.trim();
+    if (!trimmed) return null;
 
-  // Include excluded products: page still renders, UI hides price.
-  const { data, error } = await supabase
-    .from("scraped_product")
-    .select(
-      `
+    // Include excluded products: page still renders, UI hides price.
+    const { data, error } = await supabase
+      .from("scraped_product")
+      .select(
+        `
       id,
       pub_slug,
       product_name,
@@ -99,40 +100,41 @@ export async function fetchPubProductBySlug(
         domain
       )
     `
-    )
-    .eq("pub_slug", trimmed)
-    .not("pub_slug", "is", null)
-    .maybeSingle();
+      )
+      .eq("pub_slug", trimmed)
+      .not("pub_slug", "is", null)
+      .maybeSingle();
 
-  if (error) {
-    throw new Error(`Lettura prodotto pubblico: ${error.message}`);
+    if (error) {
+      throw new Error(`Lettura prodotto pubblico: ${error.message}`);
+    }
+    if (!data?.pub_slug) return null;
+
+    const isExcluded = data.is_escluded === true;
+    const priceRaw = data.final_price;
+    const finalPrice =
+      isExcluded || priceRaw == null || Number.isNaN(Number(priceRaw))
+        ? null
+        : Number(priceRaw);
+
+    return {
+      id: String(data.id),
+      pub_slug: String(data.pub_slug),
+      product_name: String(data.product_name ?? "Prodotto"),
+      brand: parseBrand(data.brand),
+      final_price: finalPrice,
+      discount: isExcluded ? null : parseDiscount(data.discount),
+      description:
+        typeof data.description === "string" && data.description.trim()
+          ? data.description.trim()
+          : null,
+      original_url: parseOriginalUrl(data.other),
+      update_at: data.update_at ? String(data.update_at) : null,
+      is_escluded: isExcluded,
+      ecommerce: parseEcommerce(data.ecommerce_brand),
+    };
   }
-  if (!data?.pub_slug) return null;
-
-  const isExcluded = data.is_escluded === true;
-  const priceRaw = data.final_price;
-  const finalPrice =
-    isExcluded || priceRaw == null || Number.isNaN(Number(priceRaw))
-      ? null
-      : Number(priceRaw);
-
-  return {
-    id: String(data.id),
-    pub_slug: String(data.pub_slug),
-    product_name: String(data.product_name ?? "Prodotto"),
-    brand: parseBrand(data.brand),
-    final_price: finalPrice,
-    discount: isExcluded ? null : parseDiscount(data.discount),
-    description:
-      typeof data.description === "string" && data.description.trim()
-        ? data.description.trim()
-        : null,
-    original_url: parseOriginalUrl(data.other),
-    update_at: data.update_at ? String(data.update_at) : null,
-    is_escluded: isExcluded,
-    ecommerce: parseEcommerce(data.ecommerce_brand),
-  };
-}
+);
 
 export async function countPubProductsForSitemap(): Promise<number> {
   const { count, error } = await supabase
