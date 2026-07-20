@@ -202,3 +202,20 @@ CREATE TABLE public.compatibility_compatible_items (
   CONSTRAINT compatibility_compatible_items_pkey PRIMARY KEY (id),
   CONSTRAINT compatibility_compatible_items_platform_id_fkey FOREIGN KEY (platform_id) REFERENCES public.compatibility_implants(id)
 );
+CREATE TABLE public.recalls_medical_device (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  titolo_rss text,
+  link_pagina text,
+  data_pubblicazione date,
+  fabbricante text,
+  nome_dispositivo text,
+  tipo_dispositivo text,
+  numero_riferimento text,
+  data_ricezione date,
+  link_pdf_allegato text,
+  data_acquisizione date,
+  other jsonb,
+  CONSTRAINT recalls_medical_device_pkey PRIMARY KEY (id),
+  CONSTRAINT recalls_medical_device_numero_riferimento_key UNIQUE (numero_riferimento)
+);

@@ -245,7 +245,7 @@ def scrape_page(page_number: int, route_label: str, base_url: str) -> str | None
                 f"[{route_label}] Pagina {page_number}: "
                 "navigazione in corso (timeout 90s)..."
             )
-            page.goto(url, wait_until="networkidle", timeout=90000)
+            page.goto(url, wait_until="domcontentloaded", timeout=90000)
             log(
                 f"[{route_label}] Pagina {page_number}: "
                 f"pagina caricata, titolo: {page.title()!r}"
