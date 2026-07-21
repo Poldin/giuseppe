@@ -1,7 +1,11 @@
 import {
+  countMedicalDevicesForSitemap,
+} from "@/app/lib/medical-device/device";
+import {
   countPubProductsForSitemap,
   PUB_SITEMAP_CHUNK_SIZE,
 } from "@/app/lib/pub/product";
+import { countRecallsForSitemap } from "@/app/lib/recall/recall";
 import { SITE_URL } from "@/app/lib/seo/site";
 
 /**
@@ -10,7 +14,12 @@ import { SITE_URL } from "@/app/lib/seo/site";
  * versione) non genera `/sitemap.xml` — lo serviamo qui + rewrite in next.config.
  */
 export async function GET() {
-  const total = await countPubProductsForSitemap();
+  const [pubTotal, recallTotal, deviceTotal] = await Promise.all([
+    countPubProductsForSitemap(),
+    countRecallsForSitemap(),
+    countMedicalDevicesForSitemap(),
+  ]);
+  const total = pubTotal + recallTotal + deviceTotal;
   const chunks = Math.max(1, Math.ceil(total / PUB_SITEMAP_CHUNK_SIZE));
 
   const entries = Array.from({ length: chunks }, (_, id) => {
@@ -28,6 +37,7 @@ ${entries}
   return new Response(xml, {
     headers: {
       "Content-Type": "application/xml; charset=utf-8",
+      // Indice leggero: totali pub+recall+medical_device; cache edge 1h
       "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
     },
   });

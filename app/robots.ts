@@ -1,6 +1,11 @@
 import { SITE_URL } from "@/app/lib/seo/site";
 import type { MetadataRoute } from "next";
 
+/**
+ * SEO pubbliche indicizzate via /sitemap.xml:
+ * /pub/*, /recall/*, /medical_device/*
+ * (allow "/" le include; chat/warehouse/api restano fuori)
+ */
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
