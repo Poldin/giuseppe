@@ -14,11 +14,18 @@ import { SITE_URL } from "@/app/lib/seo/site";
  * versione) non genera `/sitemap.xml` — lo serviamo qui + rewrite in next.config.
  */
 export async function GET() {
-  const [pubTotal, recallTotal, deviceTotal] = await Promise.all([
-    countPubProductsForSitemap(),
-    countRecallsForSitemap(),
-    countMedicalDevicesForSitemap(),
-  ]);
+  let pubTotal = 0;
+  let recallTotal = 0;
+  let deviceTotal = 0;
+  try {
+    [pubTotal, recallTotal, deviceTotal] = await Promise.all([
+      countPubProductsForSitemap(),
+      countRecallsForSitemap(),
+      countMedicalDevicesForSitemap(),
+    ]);
+  } catch (error) {
+    console.error("[sitemap-index] count failed:", error);
+  }
   const total = pubTotal + recallTotal + deviceTotal;
   const chunks = Math.max(1, Math.ceil(total / PUB_SITEMAP_CHUNK_SIZE));
 

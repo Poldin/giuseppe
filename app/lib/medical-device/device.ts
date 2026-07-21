@@ -150,7 +150,12 @@ export async function countMedicalDevicesForSitemap(): Promise<number> {
     .not("slug", "is", null);
 
   if (error) {
-    throw new Error(`Conteggio dispositivi medici sitemap: ${error.message}`);
+    const detail = [error.message, error.code, error.details, error.hint]
+      .filter(Boolean)
+      .join(" | ");
+    throw new Error(
+      `Conteggio dispositivi medici sitemap: ${detail || "errore sconosciuto"}`
+    );
   }
 
   return count ?? 0;

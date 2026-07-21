@@ -152,7 +152,10 @@ export async function countRecallsForSitemap(): Promise<number> {
     .not("link_pagina", "is", null);
 
   if (error) {
-    throw new Error(`Conteggio avvisi sitemap: ${error.message}`);
+    const detail = [error.message, error.code, error.details, error.hint]
+      .filter(Boolean)
+      .join(" | ");
+    throw new Error(`Conteggio avvisi sitemap: ${detail || "errore sconosciuto"}`);
   }
 
   return count ?? 0;

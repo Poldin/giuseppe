@@ -144,7 +144,10 @@ export async function countPubProductsForSitemap(): Promise<number> {
     .or("is_escluded.is.null,is_escluded.eq.false");
 
   if (error) {
-    throw new Error(`Conteggio prodotti sitemap: ${error.message}`);
+    const detail = [error.message, error.code, error.details, error.hint]
+      .filter(Boolean)
+      .join(" | ");
+    throw new Error(`Conteggio prodotti sitemap: ${detail || "errore sconosciuto"}`);
   }
 
   return count ?? 0;
