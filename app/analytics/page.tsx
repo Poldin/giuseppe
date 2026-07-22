@@ -1,10 +1,14 @@
+import { AnalyticsDayPicker } from "@/app/components/analytics/AnalyticsDayPicker";
 import {
   fetchMdBannerAnalytics,
+  getTodayRomeYmd,
   parseAnalyticsDays,
+  parseKpiDate,
   parseTypeFilter,
   type AnalyticsDays,
   type BannerTypeFilter,
   type DayBucket,
+  type DayKpis,
 } from "@/app/lib/analytics/md-banner";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -26,7 +30,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 type PageProps = {
-  searchParams: Promise<{ days?: string; type?: string }>;
+  searchParams: Promise<{ days?: string; type?: string; date?: string }>;
 };
 
 const DAY_OPTIONS: AnalyticsDays[] = [5, 30, 180];
@@ -36,8 +40,12 @@ const TYPE_OPTIONS: { value: BannerTypeFilter; label: string }[] = [
   { value: "close_banner", label: "Closed" },
 ];
 
-function hrefFor(days: AnalyticsDays, type: BannerTypeFilter) {
-  return `/analytics?days=${days}&type=${type}`;
+function hrefFor(
+  days: AnalyticsDays,
+  type: BannerTypeFilter,
+  date: string
+) {
+  return `/analytics?days=${days}&type=${type}&date=${date}`;
 }
 
 function formatDayLabel(ymd: string, compact: boolean) {
@@ -91,29 +99,46 @@ function FrequencyChart({
               title={`${day.date}: ${day.book_call} booked · ${day.close_banner} closed`}
             >
               {type === "all" ? (
-                <div className="flex w-full flex-col justify-end" style={{ height: "100%" }}>
+                <div
+                  className="flex w-full flex-col justify-end"
+                  style={{ height: "100%" }}
+                >
                   <div
                     className="w-full bg-[#007A6B]"
-                    style={{ height: `${bookedH}%`, minHeight: day.book_call ? 2 : 0 }}
+                    style={{
+                      height: `${bookedH}%`,
+                      minHeight: day.book_call ? 2 : 0,
+                    }}
                   />
                   <div
                     className="w-full bg-zinc-400 dark:bg-zinc-600"
-                    style={{ height: `${closedH}%`, minHeight: day.close_banner ? 2 : 0 }}
+                    style={{
+                      height: `${closedH}%`,
+                      minHeight: day.close_banner ? 2 : 0,
+                    }}
                   />
                 </div>
               ) : (
                 <div
                   className={`w-full ${type === "book_call" ? "bg-[#007A6B]" : "bg-zinc-400 dark:bg-zinc-600"}`}
-                  style={{ height: `${singleH}%`, minHeight: single ? 2 : 0 }}
+                  style={{
+                    height: `${singleH}%`,
+                    minHeight: single ? 2 : 0,
+                  }}
                 />
               )}
             </div>
           );
         })}
       </div>
-      <div className="mt-2 flex justify-between text-[10px] text-zinc-500" style={{ gap: barGap }}>
+      <div
+        className="mt-2 flex justify-between text-[10px] text-zinc-500"
+        style={{ gap: barGap }}
+      >
         <span>{formatDayLabel(series[0]?.date ?? "", compact)}</span>
-        <span>{formatDayLabel(series[series.length - 1]?.date ?? "", compact)}</span>
+        <span>
+          {formatDayLabel(series[series.length - 1]?.date ?? "", compact)}
+        </span>
       </div>
       {type === "all" ? (
         <div className="mt-3 flex gap-4 text-[10px] uppercase tracking-wide text-zinc-500">
@@ -156,15 +181,17 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const days = parseAnalyticsDays(params.days);
   const type = parseTypeFilter(params.type);
+  const today = getTodayRomeYmd();
+  const kpiDate = parseKpiDate(params.date);
 
   let series: DayBucket[] = [];
-  let yesterday = { date: "—", total: 0, booked: 0, closed: 0 };
+  let dayKpis: DayKpis = { date: kpiDate, total: 0, booked: 0, closed: 0 };
   let error: string | null = null;
 
   try {
-    const data = await fetchMdBannerAnalytics({ days, type });
+    const data = await fetchMdBannerAnalytics({ days, type, kpiDate });
     series = data.series;
-    yesterday = data.yesterday;
+    dayKpis = data.dayKpis;
   } catch (e) {
     error = e instanceof Error ? e.message : "Errore fetch";
   }
@@ -187,13 +214,18 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
       ) : (
         <>
           <section className="mb-8">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-              Ieri · {yesterday.date}
-            </p>
+            <div className="mb-3 flex items-center gap-2">
+              <AnalyticsDayPicker
+                value={kpiDate}
+                max={today}
+                days={days}
+                type={type}
+              />
+            </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <p className="text-3xl font-black tabular-nums tracking-tighter">
-                  {yesterday.total}
+                  {dayKpis.total}
                 </p>
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
                   Totale
@@ -201,7 +233,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
               </div>
               <div>
                 <p className="text-3xl font-black tabular-nums tracking-tighter text-[#007A6B]">
-                  {yesterday.booked}
+                  {dayKpis.booked}
                 </p>
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
                   Booked
@@ -209,7 +241,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
               </div>
               <div>
                 <p className="text-3xl font-black tabular-nums tracking-tighter">
-                  {yesterday.closed}
+                  {dayKpis.closed}
                 </p>
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
                   Closed
@@ -225,7 +257,11 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {DAY_OPTIONS.map((d) => (
-                  <Chip key={d} href={hrefFor(d, type)} active={days === d}>
+                  <Chip
+                    key={d}
+                    href={hrefFor(d, type, kpiDate)}
+                    active={days === d}
+                  >
                     {d}g
                   </Chip>
                 ))}
@@ -233,7 +269,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                 {TYPE_OPTIONS.map((opt) => (
                   <Chip
                     key={opt.value}
-                    href={hrefFor(days, opt.value)}
+                    href={hrefFor(days, opt.value, kpiDate)}
                     active={type === opt.value}
                   >
                     {opt.label}

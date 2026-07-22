@@ -11,7 +11,7 @@ export type DayBucket = {
   total: number;
 };
 
-export type YesterdayKpis = {
+export type DayKpis = {
   date: string;
   total: number;
   booked: number;
@@ -22,6 +22,8 @@ type LogRow = {
   type: string | null;
   created_at: string;
 };
+
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function getRomeYmd(date: Date) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -45,24 +47,25 @@ function formatYmd(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-/** Inizio UTC del giorno di calendario Europe/Rome `daysAgo` giorni fa (0 = oggi). */
+export function getTodayRomeYmd(now = new Date()): string {
+  const { year, month, day } = getRomeYmd(now);
+  return formatYmd(year, month, day);
+}
+
+/** Inizio del giorno di calendario Europe/Rome `daysAgo` giorni fa (0 = oggi). */
 function romeDayStartUtc(daysAgo: number, now = new Date()): Date {
   const today = getRomeYmd(now);
   const d = new Date(Date.UTC(today.year, today.month - 1, today.day));
   d.setUTCDate(d.getUTCDate() - daysAgo);
-  // Europe/Rome offset approximation via formatter: get the instant that is 00:00 Rome
-  // by formatting candidates is heavy; for aggregation we only need inclusive date keys.
-  // Query window: start of that Rome calendar day ≈ UTC midnight of the YMD (winter)
-  // or -1h/+2h — safest: use noon UTC of previous calendar trick.
-  // We store created_at as timestamptz; filter with YMD string cast is cleaner via ISO.
-  // Use local Rome midnight expressed as ISO by constructing from parts with offset guess.
   const ymd = formatYmd(
     d.getUTCFullYear(),
     d.getUTCMonth() + 1,
     d.getUTCDate()
   );
-  // Midnight Rome ≈ ymdT00:00:00+01:00 or +02:00; using +01:00 errs early by 1h in summer
-  // which still includes the full day when we also filter by formatted date key.
+  return new Date(`${ymd}T00:00:00+01:00`);
+}
+
+function ymdStartUtc(ymd: string): Date {
   return new Date(`${ymd}T00:00:00+01:00`);
 }
 
@@ -128,38 +131,34 @@ export function parseTypeFilter(value: string | undefined): BannerTypeFilter {
   return "all";
 }
 
+export function parseKpiDate(value: string | undefined, now = new Date()): string {
+  const today = getTodayRomeYmd(now);
+  if (!value || !YMD_RE.test(value)) return today;
+  if (value > today) return today;
+  return value;
+}
+
 export async function fetchMdBannerAnalytics(options: {
   days: AnalyticsDays;
   type: BannerTypeFilter;
+  kpiDate: string;
 }): Promise<{
   series: DayBucket[];
-  yesterday: YesterdayKpis;
+  dayKpis: DayKpis;
 }> {
   const now = new Date();
-  const since = romeDayStartUtc(options.days - 1, now);
-  // Also need yesterday for KPIs — included if days >= 2; always fetch at least 2 days window
-  const kpiSince = romeDayStartUtc(Math.max(options.days - 1, 1), now);
+  const chartSince = romeDayStartUtc(options.days - 1, now);
+  const kpiSince = ymdStartUtc(options.kpiDate);
   const querySince =
-    since.getTime() <= kpiSince.getTime() ? since : kpiSince;
+    chartSince.getTime() <= kpiSince.getTime() ? chartSince : kpiSince;
 
   const rows = await fetchRowsSince(querySince.toISOString());
 
   const buckets = buildEmptyBuckets(options.days, now);
   const byDate = new Map(buckets.map((b) => [b.date, b]));
 
-  const today = getRomeYmd(now);
-  const yesterdayDate = new Date(
-    Date.UTC(today.year, today.month - 1, today.day)
-  );
-  yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
-  const yesterdayKey = formatYmd(
-    yesterdayDate.getUTCFullYear(),
-    yesterdayDate.getUTCMonth() + 1,
-    yesterdayDate.getUTCDate()
-  );
-
-  const yesterday: YesterdayKpis = {
-    date: yesterdayKey,
+  const dayKpis: DayKpis = {
+    date: options.kpiDate,
     total: 0,
     booked: 0,
     closed: 0,
@@ -170,10 +169,10 @@ export async function fetchMdBannerAnalytics(options: {
     const isClose = row.type === "close_banner";
     const isBook = row.type === "book_call";
 
-    if (key === yesterdayKey) {
-      if (isClose) yesterday.closed += 1;
-      if (isBook) yesterday.booked += 1;
-      if (isClose || isBook) yesterday.total += 1;
+    if (key === options.kpiDate) {
+      if (isClose) dayKpis.closed += 1;
+      if (isBook) dayKpis.booked += 1;
+      if (isClose || isBook) dayKpis.total += 1;
     }
 
     const bucket = byDate.get(key);
@@ -187,5 +186,5 @@ export async function fetchMdBannerAnalytics(options: {
     if (isClose || isBook) bucket.total += 1;
   }
 
-  return { series: buckets, yesterday };
+  return { series: buckets, dayKpis };
 }
