@@ -45,4 +45,5 @@ next-env.d.ts
 
 # scraping runtime logs
 app/lib/scraping/*.log
+app/lib/scraping/logs/
 app/lib/scraping/_probe*

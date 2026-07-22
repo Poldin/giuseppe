@@ -244,3 +244,10 @@ CREATE TABLE public.medical_devices (
   other jsonb NOT NULL DEFAULT '{}'::jsonb,
   CONSTRAINT medical_devices_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.log_md_banner (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  type text,
+  page_url text,
+  CONSTRAINT log_md_banner_pkey PRIMARY KEY (id)
+);

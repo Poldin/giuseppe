@@ -1,13 +1,22 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Loader2, X } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+} from "react";
 
 const STORAGE_KEY = "giuseppe.chat-sponsored-banner.dismissed-date";
 const SHOW_DELAY_MS = 10_000;
 const CLOSE_DELAY_MS = 5_000;
 const DAY_CHECK_MS = 60_000;
+
+type BannerLogType = "close_banner" | "book_call";
+type PendingAction = BannerLogType | null;
 
 function getLocalDateKey(): string {
   return new Date().toLocaleDateString("en-CA");
@@ -29,6 +38,22 @@ function markDismissedToday(): void {
   }
 }
 
+async function logBannerEvent(type: BannerLogType): Promise<boolean> {
+  try {
+    const res = await fetch("/api/md-banner/log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type,
+        page_url: window.location.href,
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 type ChatSponsoredBannerProps = {
   title?: string;
   description?: string;
@@ -47,6 +72,7 @@ export function ChatSponsoredBanner({
   const [secondsUntilClose, setSecondsUntilClose] = useState(
     Math.ceil(CLOSE_DELAY_MS / 1000)
   );
+  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
 
   const visibleRef = useRef(false);
 
@@ -54,6 +80,28 @@ export function ChatSponsoredBanner({
     markDismissedToday();
     setVisible(false);
   }, []);
+
+  const handleClose = useCallback(async () => {
+    if (!canClose || pendingAction) return;
+
+    setPendingAction("close_banner");
+    await logBannerEvent("close_banner");
+    setPendingAction(null);
+    dismiss();
+  }, [canClose, dismiss, pendingAction]);
+
+  const handleBookCall = useCallback(
+    async (event: MouseEvent<HTMLAnchorElement>) => {
+      event.preventDefault();
+      if (!ctaHref || pendingAction) return;
+
+      setPendingAction("book_call");
+      await logBannerEvent("book_call");
+      setPendingAction(null);
+      window.open(ctaHref, "_blank", "noopener,noreferrer");
+    },
+    [ctaHref, pendingAction]
+  );
 
   useEffect(() => {
     visibleRef.current = visible;
@@ -134,6 +182,10 @@ export function ChatSponsoredBanner({
     };
   }, [visible]);
 
+  const isLogging = pendingAction !== null;
+  const isClosing = pendingAction === "close_banner";
+  const isBooking = pendingAction === "book_call";
+
   return (
     <AnimatePresence>
       {visible ? (
@@ -162,8 +214,14 @@ export function ChatSponsoredBanner({
                   href={ctaHref}
                   target="_blank"
                   rel="noopener noreferrer sponsored"
-                  className="mt-3 inline-flex rounded-lg bg-[#007A6B] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#006559]"
+                  onClick={handleBookCall}
+                  aria-busy={isBooking}
+                  aria-disabled={isLogging}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[#007A6B] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#006559] aria-disabled:pointer-events-none aria-disabled:opacity-70"
                 >
+                  {isBooking ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                  ) : null}
                   {ctaLabel}
                 </a>
               ) : null}
@@ -171,16 +229,21 @@ export function ChatSponsoredBanner({
 
             <button
               type="button"
-              onClick={dismiss}
-              disabled={!canClose}
+              onClick={handleClose}
+              disabled={!canClose || isLogging}
+              aria-busy={isClosing}
               aria-label={
-                canClose
-                  ? "Chiudi banner sponsorizzato"
-                  : `Chiudi disponibile tra ${secondsUntilClose} secondi`
+                isClosing
+                  ? "Salvataggio in corso"
+                  : canClose
+                    ? "Chiudi banner sponsorizzato"
+                    : `Chiudi disponibile tra ${secondsUntilClose} secondi`
               }
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-zinc-200 text-zinc-400 transition-colors hover:bg-zinc-50 hover:text-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {canClose ? (
+              {isClosing ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              ) : canClose ? (
                 <X className="h-4 w-4" aria-hidden />
               ) : (
                 <span className="text-[10px] font-bold tabular-nums text-zinc-500">

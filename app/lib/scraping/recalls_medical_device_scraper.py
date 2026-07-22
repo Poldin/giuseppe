@@ -13,6 +13,7 @@ Uso:
   python app/lib/scraping/recalls_medical_device_scraper.py --limit 5
   python app/lib/scraping/recalls_medical_device_scraper.py --stop-after-dupes 10
   python app/lib/scraping/recalls_medical_device_scraper.py --full
+  python app/lib/scraping/recalls_medical_device_scraper.py --config path.json
 """
 
 from __future__ import annotations
@@ -31,6 +32,8 @@ from urllib.parse import urljoin
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import Client, create_client
+
+from scrape_cli import load_config, prompt_yes_no, require_interactive_tty
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 load_dotenv(ROOT_DIR / ".env.local")
@@ -609,9 +612,91 @@ def run(
         log(f"Riassunto errori sequenziali in: {ERROR_LOG_PATH}")
 
 
-def parse_args() -> argparse.Namespace:
+def prompt_limit() -> int | None:
+    print()
+    print("Recalls: limite massimo avvisi dall'indice? (smoke test)")
+    print("  Invio      → nessun limite")
+    print("  Numero N   → al massimo N avvisi")
+
+    while True:
+        raw = input("> ").strip().lower()
+        if raw == "":
+            return None
+        if raw.isdigit():
+            limit = int(raw)
+            if limit >= 1:
+                return limit
+            print("Inserisci un numero >= 1.")
+            continue
+        print("Inserisci un numero >= 1 oppure Invio per nessun limite.")
+
+
+def prompt_stop_after_dupes() -> int:
+    print()
+    print(
+        "Recalls: stop dopo quanti duplicati consecutivi? "
+        f"(default {DEFAULT_STOP_AFTER_DUPES})"
+    )
+    print(f'  Invio      → {DEFAULT_STOP_AFTER_DUPES}')
+    print("  Numero N   → stop dopo N duplicati consecutivi")
+
+    while True:
+        raw = input("> ").strip().lower()
+        if raw == "":
+            return DEFAULT_STOP_AFTER_DUPES
+        if raw.isdigit():
+            value = int(raw)
+            if value >= 1:
+                return value
+            print("Inserisci un numero >= 1.")
+            continue
+        print(f"Inserisci un numero >= 1 oppure Invio per {DEFAULT_STOP_AFTER_DUPES}.")
+
+
+def prompt_run_options() -> dict[str, Any]:
+    print()
+    print("=== Configurazione Recalls Ministero ===")
+    full = prompt_yes_no(
+        "Backfill completo (--full: scorri tutto, no early-stop)?",
+        default=False,
+    )
+    if full:
+        return {
+            "full": True,
+            "limit": prompt_limit(),
+            "stop_after_dupes": DEFAULT_STOP_AFTER_DUPES,
+        }
+
+    return {
+        "full": False,
+        "limit": prompt_limit(),
+        "stop_after_dupes": prompt_stop_after_dupes(),
+    }
+
+
+def run_from_config(config: dict[str, Any]) -> None:
+    full = bool(config.get("full", False))
+    limit_raw = config.get("limit")
+    limit = int(limit_raw) if limit_raw is not None else None
+    stop_raw = config.get("stop_after_dupes", DEFAULT_STOP_AFTER_DUPES)
+    stop_after_dupes = int(stop_raw) if stop_raw is not None else DEFAULT_STOP_AFTER_DUPES
+
+    if limit is not None and limit < 1:
+        raise ValueError("--limit / config.limit deve essere >= 1")
+    if not full and stop_after_dupes < 1:
+        raise ValueError("stop_after_dupes deve essere >= 1")
+
+    run(limit=limit, stop_after_dupes=stop_after_dupes, full=full)
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Scraper avvisi dispositivi medici Ministero della Salute"
+    )
+    parser.add_argument(
+        "--config",
+        metavar="PATH",
+        help="JSON di configurazione: se presente, nessuno prompt interattivo",
     )
     parser.add_argument(
         "--limit",
@@ -630,21 +715,48 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Backfill completo: salta i già presenti ma non fa early-stop",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main() -> None:
-    args = parse_args()
-    if args.limit is not None and args.limit < 1:
-        log("--limit deve essere >= 1")
-        sys.exit(1)
-    if not args.full and args.stop_after_dupes < 1:
-        log("--stop-after-dupes deve essere >= 1")
-        sys.exit(1)
+def _has_cli_overrides(argv: list[str]) -> bool:
+    flags = ("--limit", "--full", "--stop-after-dupes")
+    return any(arg == flag or arg.startswith(f"{flag}=") for arg in argv for flag in flags)
+
+
+def main(argv: list[str] | None = None) -> None:
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    args = parse_args(raw_argv)
+
+    if args.config:
+        try:
+            run_from_config(load_config(Path(args.config)))
+        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+            log(f"Config non valida: {exc}")
+            sys.exit(1)
+        return
+
+    if _has_cli_overrides(raw_argv):
+        if args.limit is not None and args.limit < 1:
+            log("--limit deve essere >= 1")
+            sys.exit(1)
+        if not args.full and args.stop_after_dupes < 1:
+            log("--stop-after-dupes deve essere >= 1")
+            sys.exit(1)
+        run(
+            limit=args.limit,
+            stop_after_dupes=args.stop_after_dupes,
+            full=args.full,
+        )
+        return
+
+    require_interactive_tty(
+        "python app/lib/scraping/recalls_medical_device_scraper.py"
+    )
+    options = prompt_run_options()
     run(
-        limit=args.limit,
-        stop_after_dupes=args.stop_after_dupes,
-        full=args.full,
+        limit=options["limit"],
+        stop_after_dupes=options["stop_after_dupes"],
+        full=options["full"],
     )
 
 

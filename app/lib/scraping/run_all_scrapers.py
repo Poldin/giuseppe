@@ -1,9 +1,10 @@
 """
-Orchestratore scraping cataloghi e-commerce.
+Orchestratore scraping cataloghi e-commerce + Ministero della Salute.
 
 Due modalità:
-  regionale   → flusso attuale: conferma e domande dentro ogni scraper
-  frecciarossa → tutte le domande all'inizio, poi run silenzioso via --config
+  regionale   → conferma e domande dentro ogni scraper (sempre sequenziale)
+  frecciarossa → tutte le domande all'inizio, poi run via --config
+                 e-commerce (≥2) in parallelo; Ministero in sequenza dopo
 
 Uso (dal terminale integrato):
   python app/lib/scraping/run_all_scrapers.py
@@ -15,6 +16,10 @@ import json
 import subprocess
 import sys
 import tempfile
+import threading
+import time
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -23,10 +28,26 @@ from scrape_pages import page_plan_to_dict, prompt_page_plan, prompt_total_pages
 from scrape_session import default_session_id
 
 SCRAPING_DIR = Path(__file__).resolve().parent
+LOGS_DIR = SCRAPING_DIR / "logs"
 
 OrchestratorMode = Literal["regionale", "frecciarossa"]
 
-# Aggiungi qui i nuovi e-commerce man mano che crei gli scraper.
+ECOMMERCE_KEYS = frozenset({"dentaltix", "gerho", "dontalia"})
+STATUS_EVERY_SEC = 30
+TAIL_LINES_ON_FAIL = 40
+
+PlannedJob = tuple[dict[str, Any], dict[str, Any]]
+
+
+@dataclass
+class ParallelJobResult:
+    name: str
+    key: str
+    exit_code: int
+    log_path: Path
+    elapsed_sec: float
+
+# Aggiungi qui i nuovi job man mano che crei gli scraper.
 SCRAPERS: list[dict[str, Any]] = [
     {
         "key": "dentaltix",
@@ -100,6 +121,22 @@ SCRAPERS: list[dict[str, Any]] = [
             },
         ],
     },
+    {
+        "key": "recalls_medical_device",
+        "name": "Recalls Ministero",
+        "script": "recalls_medical_device_scraper.py",
+        "note": "Avvisi di sicurezza dispositivi medici",
+        "catalog_url": None,
+        "routes": None,
+    },
+    {
+        "key": "medical_devices",
+        "name": "Medical Devices Ministero",
+        "script": "medical_devices_update.py",
+        "note": "Repertorio DM — import JSON CND odontoiatrici",
+        "catalog_url": None,
+        "routes": None,
+    },
 ]
 
 
@@ -107,7 +144,7 @@ def prompt_orchestrator_mode() -> OrchestratorMode:
     print()
     print("Modalità treno:")
     print('  Invio / "r" → regionale  (domande durante ogni scraper, come oggi)')
-    print('  "f"         → frecciarossa (tutte le domande ora, poi run senza interruzioni)')
+    print('  "f"         → frecciarossa (domande subito; e-commerce in parallelo)')
 
     while True:
         raw = input("> ").strip().lower()
@@ -149,8 +186,88 @@ def prompt_start_page_shared() -> int:
         print("Inserisci un numero >= 1 oppure Invio per partire da 1.")
 
 
+def prompt_recalls_config() -> dict[str, Any]:
+    print()
+    print("--- Configurazione Recalls Ministero ---")
+    full = prompt_yes_no(
+        "Recalls: backfill completo (--full: scorri tutto, no early-stop)?",
+        default=False,
+    )
+
+    print()
+    print("Recalls: limite massimo avvisi dall'indice? (smoke test)")
+    print("  Invio      → nessun limite")
+    print("  Numero N   → al massimo N avvisi")
+    while True:
+        raw = input("> ").strip().lower()
+        if raw == "":
+            limit: int | None = None
+            break
+        if raw.isdigit():
+            value = int(raw)
+            if value >= 1:
+                limit = value
+                break
+            print("Inserisci un numero >= 1.")
+            continue
+        print("Inserisci un numero >= 1 oppure Invio per nessun limite.")
+
+    if full:
+        return {"full": True, "limit": limit, "stop_after_dupes": 10}
+
+    print()
+    print("Recalls: stop dopo quanti duplicati consecutivi? (default 10)")
+    print("  Invio      → 10")
+    print("  Numero N   → stop dopo N duplicati consecutivi")
+    while True:
+        raw = input("> ").strip().lower()
+        if raw == "":
+            stop_after = 10
+            break
+        if raw.isdigit():
+            value = int(raw)
+            if value >= 1:
+                stop_after = value
+                break
+            print("Inserisci un numero >= 1.")
+            continue
+        print("Inserisci un numero >= 1 oppure Invio per 10.")
+
+    return {"full": False, "limit": limit, "stop_after_dupes": stop_after}
+
+
+def prompt_medical_devices_config() -> dict[str, Any] | None:
+    print()
+    print("--- Configurazione Medical Devices Ministero ---")
+    print("Inserisci uno o più path JSON (dump completo e/o variazioni settimanali).")
+    print("  path       → aggiungi il file")
+    print("  Invio      → conferma la lista (serve almeno un file)")
+    print('  "skip"     → salta questo job')
+
+    files: list[str] = []
+    while True:
+        raw = input("> ").strip().strip('"')
+        if raw.lower() == "skip":
+            return None
+        if raw == "":
+            if files:
+                return {"files": files}
+            print("Inserisci almeno un path JSON, oppure digita skip.")
+            continue
+
+        path = Path(raw)
+        if not path.exists():
+            print(f"File non trovato: {path}")
+            continue
+        if not path.is_file():
+            print(f"Non è un file: {path}")
+            continue
+        files.append(str(path.resolve()))
+        print(f"  + {path}  (totale {len(files)})")
+
+
 def collect_frecciarossa_plan() -> list[tuple[dict[str, Any], dict[str, Any]]]:
-    """Raccoglie config per ogni ecommerce abilitato. Ritorna [(scraper, config), ...]."""
+    """Raccoglie config per ogni job abilitato. Ritorna [(scraper, config), ...]."""
     print()
     print("=== Questionario Frecciarossa ===")
     print("Rispondi a tutto ora: dopo non ti verrà chiesto nulla.")
@@ -162,10 +279,11 @@ def collect_frecciarossa_plan() -> list[tuple[dict[str, Any], dict[str, Any]]]:
             selected.append(scraper)
 
     if not selected:
-        print("Nessun e-commerce selezionato.")
+        print("Nessun job selezionato.")
         return []
 
-    session_id = prompt_session_id_global()
+    needs_session = any(scraper["key"] in ECOMMERCE_KEYS for scraper in selected)
+    session_id = prompt_session_id_global() if needs_session else None
     planned: list[tuple[dict[str, Any], dict[str, Any]]] = []
 
     for scraper in selected:
@@ -185,6 +303,7 @@ def collect_frecciarossa_plan() -> list[tuple[dict[str, Any], dict[str, Any]]]:
                 continue
 
             page_plan = prompt_page_plan()
+            assert session_id is not None
             config: dict[str, Any] = {
                 "session_id": session_id,
                 "routes": routes,
@@ -212,6 +331,7 @@ def collect_frecciarossa_plan() -> list[tuple[dict[str, Any], dict[str, Any]]]:
                 print(f"Nessuna rotta per {name}, saltato.")
                 continue
 
+            assert session_id is not None
             start_page = prompt_start_page_shared()
             planned.append(
                 (
@@ -225,16 +345,36 @@ def collect_frecciarossa_plan() -> list[tuple[dict[str, Any], dict[str, Any]]]:
             )
             continue
 
-        print(f"ERRORE: ecommerce non gestito in frecciarossa: {key}")
+        if key == "recalls_medical_device":
+            planned.append((scraper, prompt_recalls_config()))
+            continue
+
+        if key == "medical_devices":
+            md_config = prompt_medical_devices_config()
+            if md_config is None:
+                print(f"Saltato: {name}")
+                continue
+            planned.append((scraper, md_config))
+            continue
+
+        print(f"ERRORE: job non gestito in frecciarossa: {key}")
 
     return planned
 
 
-def print_frecciarossa_summary(
-    planned: list[tuple[dict[str, Any], dict[str, Any]]],
-) -> None:
+def print_frecciarossa_summary(planned: list[PlannedJob]) -> None:
     print()
     print("=== Riepilogo Frecciarossa ===")
+    ecommerce = [s["name"] for s, _ in planned if s["key"] in ECOMMERCE_KEYS]
+    ministry = [s["name"] for s, _ in planned if s["key"] not in ECOMMERCE_KEYS]
+    if len(ecommerce) >= 2:
+        print(
+            f"  Parallelismo: e-commerce insieme "
+            f"[{', '.join(ecommerce)}]; Ministero in sequenza dopo"
+        )
+    elif ecommerce and ministry:
+        print("  Ordine: e-commerce, poi Ministero (sequenza)")
+    session_ids: set[str] = set()
     for scraper, config in planned:
         name = scraper["name"]
         if scraper["key"] in ("dentaltix", "gerho"):
@@ -249,16 +389,44 @@ def print_frecciarossa_summary(
                 )
                 detail = f"da {plan['start_page']}, totali [{totals}]"
             print(f"  • {name}: rotte [{routes}]; {detail}")
+            session_ids.add(config["session_id"])
         elif scraper["key"] == "dontalia":
             routes = ", ".join(config["routes"])
             print(
                 f"  • {name}: rotte [{routes}]; "
                 f"start page {config['start_page']} (fino a vuota)"
             )
+            session_ids.add(config["session_id"])
+        elif scraper["key"] == "recalls_medical_device":
+            if config.get("full"):
+                mode = "full"
+            else:
+                mode = f"stop-after-dupes={config.get('stop_after_dupes', 10)}"
+            limit = config.get("limit")
+            limit_txt = f", limit={limit}" if limit is not None else ""
+            print(f"  • {name}: {mode}{limit_txt}")
+        elif scraper["key"] == "medical_devices":
+            files = config.get("files") or []
+            names = ", ".join(Path(item).name for item in files)
+            print(f"  • {name}: {len(files)} file [{names}]")
         else:
             print(f"  • {name}")
-    print(f"  Session ID: {planned[0][1]['session_id']}")
+    if session_ids:
+        print(f"  Session ID: {', '.join(sorted(session_ids))}")
     print()
+
+
+def write_config_file(config: dict[str, Any]) -> Path:
+    handle = tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        suffix=".json",
+        prefix="scrape_config_",
+        delete=False,
+    )
+    with handle:
+        json.dump(config, handle, ensure_ascii=False, indent=2)
+    return Path(handle.name)
 
 
 def run_scraper(script_name: str, config: dict[str, Any] | None = None) -> int:
@@ -273,16 +441,7 @@ def run_scraper(script_name: str, config: dict[str, Any] | None = None) -> int:
             cwd=str(SCRAPING_DIR),
         ).returncode
 
-    with tempfile.NamedTemporaryFile(
-        mode="w",
-        encoding="utf-8",
-        suffix=".json",
-        prefix="scrape_config_",
-        delete=False,
-    ) as handle:
-        json.dump(config, handle, ensure_ascii=False, indent=2)
-        config_path = Path(handle.name)
-
+    config_path = write_config_file(config)
     try:
         return subprocess.run(
             [sys.executable, str(script_path), "--config", str(config_path)],
@@ -290,6 +449,152 @@ def run_scraper(script_name: str, config: dict[str, Any] | None = None) -> int:
         ).returncode
     finally:
         config_path.unlink(missing_ok=True)
+
+
+def run_scraper_to_log(
+    script_name: str,
+    config: dict[str, Any],
+    log_path: Path,
+) -> int:
+    script_path = SCRAPING_DIR / script_name
+    if not script_path.is_file():
+        log_path.write_text(
+            f"ERRORE: script non trovato -> {script_path}\n",
+            encoding="utf-8",
+        )
+        return 1
+
+    config_path = write_config_file(config)
+    try:
+        with log_path.open("w", encoding="utf-8", errors="replace") as log_fh:
+            log_fh.write(f"# script: {script_name}\n")
+            log_fh.write(f"# started: {datetime.now().isoformat(timespec='seconds')}\n")
+            log_fh.write("#" + "-" * 60 + "\n")
+            log_fh.flush()
+            completed = subprocess.run(
+                [sys.executable, str(script_path), "--config", str(config_path)],
+                cwd=str(SCRAPING_DIR),
+                stdout=log_fh,
+                stderr=subprocess.STDOUT,
+            )
+            log_fh.write("#" + "-" * 60 + "\n")
+            log_fh.write(
+                f"# finished: {datetime.now().isoformat(timespec='seconds')} "
+                f"exit={completed.returncode}\n"
+            )
+            return completed.returncode
+    finally:
+        config_path.unlink(missing_ok=True)
+
+
+def tail_log(path: Path, max_lines: int = TAIL_LINES_ON_FAIL) -> list[str]:
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return []
+    return lines[-max_lines:]
+
+
+def run_ecommerce_parallel(jobs: list[PlannedJob]) -> list[ParallelJobResult]:
+    """Esegue i 3 e-commerce in parallelo; console = solo stato, dettagli su file."""
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = LOGS_DIR / f"frecciarossa_{stamp}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    names = [scraper["name"] for scraper, _ in jobs]
+    print()
+    print(f"=== Onda parallela e-commerce ({len(jobs)}) ===")
+    print(f"In corso insieme: {', '.join(names)}")
+    print("Console: solo stato (niente log mischiati).")
+    print(f"Dettagli per sito: {run_dir}")
+    for scraper, _ in jobs:
+        log_file = run_dir / f"{scraper['key']}.log"
+        print(f"  • {scraper['name']}: {log_file}")
+    print("-" * 50)
+
+    results: dict[str, ParallelJobResult] = {}
+    lock = threading.Lock()
+    started_at = time.monotonic()
+
+    def worker(scraper: dict[str, Any], config: dict[str, Any]) -> None:
+        key = scraper["key"]
+        name = scraper["name"]
+        log_path = run_dir / f"{key}.log"
+        job_started = time.monotonic()
+        with lock:
+            print(f"▶ START  {name}")
+        try:
+            exit_code = run_scraper_to_log(scraper["script"], config, log_path)
+        except Exception as exc:  # noqa: BLE001 - non far crashare gli altri worker
+            exit_code = 1
+            with log_path.open("a", encoding="utf-8", errors="replace") as log_fh:
+                log_fh.write(f"\nORCHESTRATOR ERROR: {type(exc).__name__}: {exc}\n")
+        elapsed = time.monotonic() - job_started
+        result = ParallelJobResult(
+            name=name,
+            key=key,
+            exit_code=exit_code,
+            log_path=log_path,
+            elapsed_sec=elapsed,
+        )
+        with lock:
+            results[key] = result
+            status = "OK" if exit_code == 0 else f"ERR({exit_code})"
+            print(f"■ DONE   {name}  [{status}]  {elapsed / 60:.1f} min  → {log_path.name}")
+
+    threads = [
+        threading.Thread(
+            target=worker,
+            args=(scraper, config),
+            name=f"scrape-{scraper['key']}",
+            daemon=True,
+        )
+        for scraper, config in jobs
+    ]
+    for thread in threads:
+        thread.start()
+
+    last_status_at = started_at
+    while any(thread.is_alive() for thread in threads):
+        for thread in threads:
+            thread.join(timeout=1)
+        now = time.monotonic()
+        if now - last_status_at < STATUS_EVERY_SEC:
+            continue
+        if not any(thread.is_alive() for thread in threads):
+            break
+        last_status_at = now
+        running = [
+            scraper["name"]
+            for scraper, _ in jobs
+            if any(
+                thread.name == f"scrape-{scraper['key']}" and thread.is_alive()
+                for thread in threads
+            )
+        ]
+        done = [scraper["name"] for scraper, _ in jobs if scraper["key"] in results]
+        elapsed = now - started_at
+        with lock:
+            print(
+                f"… status {elapsed / 60:.1f}m — "
+                f"running: [{', '.join(running) or '-'}] | "
+                f"done: [{', '.join(done) or '-'}]"
+            )
+
+    for thread in threads:
+        thread.join()
+
+    ordered = [results[scraper["key"]] for scraper, _ in jobs if scraper["key"] in results]
+    print("-" * 50)
+    print(f"Onda parallela terminata. Log: {run_dir}")
+    for result in ordered:
+        if result.exit_code == 0:
+            continue
+        print()
+        print(f"--- Tail errore {result.name} ({result.log_path.name}) ---")
+        for line in tail_log(result.log_path):
+            print(line)
+    return ordered
 
 
 def run_regionale() -> None:
@@ -324,7 +629,7 @@ def run_regionale() -> None:
         failed.append(name)
 
         if index < len(SCRAPERS) and not prompt_yes_no(
-            "Continuare con il prossimo e-commerce?",
+            "Continuare con il prossimo job?",
             default=False,
         ):
             break
@@ -344,13 +649,59 @@ def run_frecciarossa() -> None:
         print("Annullato.")
         return
 
+    ecommerce_jobs = [
+        (scraper, config)
+        for scraper, config in planned
+        if scraper["key"] in ECOMMERCE_KEYS
+    ]
+    sequential_jobs = [
+        (scraper, config)
+        for scraper, config in planned
+        if scraper["key"] not in ECOMMERCE_KEYS
+    ]
+
     completed: list[str] = []
     failed: list[str] = []
 
-    for index, (scraper, config) in enumerate(planned, start=1):
+    if ecommerce_jobs:
+        if len(ecommerce_jobs) == 1:
+            scraper, config = ecommerce_jobs[0]
+            name = scraper["name"]
+            print()
+            print(f"--- {name} (frecciarossa, singolo) ---")
+            print(f"Avvio scraper {name} senza ulteriori domande...")
+            print("-" * 50)
+            exit_code = run_scraper(scraper["script"], config)
+            print("-" * 50)
+            if exit_code == 0:
+                print(f"Completato: {name}")
+                completed.append(name)
+            else:
+                print(f"Terminato con errore (codice {exit_code}): {name}")
+                failed.append(name)
+        else:
+            for result in run_ecommerce_parallel(ecommerce_jobs):
+                if result.exit_code == 0:
+                    completed.append(result.name)
+                else:
+                    failed.append(result.name)
+
+        if failed and sequential_jobs:
+            print()
+            if not prompt_yes_no(
+                "Alcuni e-commerce hanno fallito. Continuare con Ministero?",
+                default=False,
+            ):
+                print_riepilogo(completed, [], failed)
+                return
+
+    for index, (scraper, config) in enumerate(sequential_jobs, start=1):
         name = scraper["name"]
         print()
-        print(f"--- [{index}/{len(planned)}] {name} (frecciarossa) ---")
+        print(
+            f"--- [{index}/{len(sequential_jobs)}] {name} "
+            f"(frecciarossa, sequenziale) ---"
+        )
         print(f"Avvio scraper {name} senza ulteriori domande...")
         print("-" * 50)
         exit_code = run_scraper(scraper["script"], config)
@@ -364,8 +715,8 @@ def run_frecciarossa() -> None:
         print(f"Terminato con errore (codice {exit_code}): {name}")
         failed.append(name)
 
-        if index < len(planned) and not prompt_yes_no(
-            "Continuare con il prossimo e-commerce?",
+        if index < len(sequential_jobs) and not prompt_yes_no(
+            "Continuare con il prossimo job?",
             default=False,
         ):
             break
@@ -400,8 +751,8 @@ def main() -> None:
     require_interactive_tty("python app/lib/scraping/run_all_scrapers.py")
 
     print()
-    print("=== Orchestratore scraping cataloghi ===")
-    print(f"E-commerce in coda: {len(SCRAPERS)}")
+    print("=== Orchestratore scraping ===")
+    print(f"Job in coda: {len(SCRAPERS)}")
     for index, scraper in enumerate(SCRAPERS, start=1):
         note = scraper.get("note", "")
         suffix = f" — {note}" if note else ""

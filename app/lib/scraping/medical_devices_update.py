@@ -9,9 +9,11 @@ Flusso:
   5. Se un progressivo compare negli update ma esce dallo scope CND → delete
 
 Uso:
+  python app/lib/scraping/medical_devices_update.py
   python app/lib/scraping/medical_devices_update.py path/al/dump.json
   python app/lib/scraping/medical_devices_update.py file1.json file2.json
   python app/lib/scraping/medical_devices_update.py a.json a.json  # path ripetuti: ok
+  python app/lib/scraping/medical_devices_update.py --config path.json
 """
 
 from __future__ import annotations
@@ -28,6 +30,8 @@ from typing import Any, Iterator
 
 from dotenv import load_dotenv
 from supabase import Client, create_client
+
+from scrape_cli import load_config, require_interactive_tty
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 load_dotenv(ROOT_DIR / ".env.local")
@@ -423,16 +427,61 @@ def process_files(paths: list[Path]) -> None:
     log("Done.")
 
 
-def main() -> None:
+def prompt_json_files() -> list[Path]:
+    print()
+    print("=== Configurazione Medical Devices (Repertorio) ===")
+    print("Inserisci uno o più path JSON (dump completo e/o variazioni settimanali).")
+    print("  path       → aggiungi il file")
+    print("  Invio      → conferma la lista (serve almeno un file)")
+
+    files: list[Path] = []
+    while True:
+        raw = input("> ").strip().strip('"')
+        if raw == "":
+            if files:
+                return files
+            print("Inserisci almeno un path JSON.")
+            continue
+
+        path = Path(raw)
+        if not path.exists():
+            print(f"File non trovato: {path}")
+            continue
+        if not path.is_file():
+            print(f"Non è un file: {path}")
+            continue
+        files.append(path)
+        print(f"  + {path}  (totale {len(files)})")
+
+
+def run_from_config(config: dict[str, Any]) -> None:
+    files_raw = config.get("files")
+    if not isinstance(files_raw, list) or not files_raw:
+        raise ValueError("config.files deve essere una lista non vuota di path")
+
+    paths = [Path(str(item)) for item in files_raw]
+    process_files(paths)
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Import/update medical_devices da JSON Ministero della Salute"
     )
     parser.add_argument(
+        "--config",
+        metavar="PATH",
+        help="JSON di configurazione: se presente, nessuno prompt interattivo",
+    )
+    parser.add_argument(
         "files",
-        nargs="+",
+        nargs="*",
         help="Uno o più path JSON (dump completo e/o variazioni settimanali)",
     )
-    args = parser.parse_args()
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
 
     log("=== medical_devices update ===")
     log(f"Tabella: {TABLE} | batch max: {BATCH_SIZE}")
@@ -444,7 +493,20 @@ def main() -> None:
         log(f"Connessione Supabase FALLITA -> {type(exc).__name__}: {exc}")
         sys.exit(1)
 
-    process_files([Path(item) for item in args.files])
+    if args.config:
+        try:
+            run_from_config(load_config(Path(args.config)))
+        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+            log(f"Config non valida: {exc}")
+            sys.exit(1)
+        return
+
+    if args.files:
+        process_files([Path(item) for item in args.files])
+        return
+
+    require_interactive_tty("python app/lib/scraping/medical_devices_update.py")
+    process_files(prompt_json_files())
 
 
 if __name__ == "__main__":
