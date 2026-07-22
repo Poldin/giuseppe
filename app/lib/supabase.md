@@ -251,3 +251,32 @@ CREATE TABLE public.log_md_banner (
   page_url text,
   CONSTRAINT log_md_banner_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.document_sources (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  slug text NOT NULL UNIQUE,
+  name text NOT NULL,
+  domain text,
+  logo_url text,
+  is_active boolean NOT NULL DEFAULT true,
+  other jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT document_sources_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.manufacturer_documents (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  source_id uuid NOT NULL,
+  slug text NOT NULL UNIQUE,
+  title text NOT NULL,
+  description text,
+  asset_type text NOT NULL,
+  file_url text NOT NULL,
+  product_name text,
+  last_seen_at timestamp with time zone,
+  is_active boolean NOT NULL DEFAULT true,
+  other jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT manufacturer_documents_pkey PRIMARY KEY (id),
+  CONSTRAINT manufacturer_documents_source_id_fkey FOREIGN KEY (source_id) REFERENCES public.document_sources(id)
+);

@@ -1,4 +1,7 @@
 import {
+  countDocsForSitemap,
+} from "@/app/lib/docs/document";
+import {
   countMedicalDevicesForSitemap,
 } from "@/app/lib/medical-device/device";
 import {
@@ -17,16 +20,18 @@ export async function GET() {
   let pubTotal = 0;
   let recallTotal = 0;
   let deviceTotal = 0;
+  let docsTotal = 0;
   try {
-    [pubTotal, recallTotal, deviceTotal] = await Promise.all([
+    [pubTotal, recallTotal, deviceTotal, docsTotal] = await Promise.all([
       countPubProductsForSitemap(),
       countRecallsForSitemap(),
       countMedicalDevicesForSitemap(),
+      countDocsForSitemap(),
     ]);
   } catch (error) {
     console.error("[sitemap-index] count failed:", error);
   }
-  const total = pubTotal + recallTotal + deviceTotal;
+  const total = pubTotal + recallTotal + deviceTotal + docsTotal;
   const chunks = Math.max(1, Math.ceil(total / PUB_SITEMAP_CHUNK_SIZE));
 
   const entries = Array.from({ length: chunks }, (_, id) => {
@@ -44,7 +49,7 @@ ${entries}
   return new Response(xml, {
     headers: {
       "Content-Type": "application/xml; charset=utf-8",
-      // Indice leggero: totali pub+recall+medical_device; cache edge 1h
+      // Indice leggero: totali pub+recall+medical_device+docs; cache edge 1h
       "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
     },
   });

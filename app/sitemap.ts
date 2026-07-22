@@ -1,4 +1,8 @@
 import {
+  fetchDocSitemapEntries,
+} from "@/app/lib/docs/document";
+import {
+  countMedicalDevicesForSitemap,
   fetchMedicalDeviceSitemapEntries,
 } from "@/app/lib/medical-device/device";
 import {
@@ -10,6 +14,7 @@ import {
   countRecallsForSitemap,
   fetchRecallSitemapEntries,
 } from "@/app/lib/recall/recall";
+import { docsPath } from "@/app/lib/seo/docs";
 import { medicalDevicePath } from "@/app/lib/seo/medical-device";
 import { recallPath } from "@/app/lib/seo/recall";
 import { SITE_URL } from "@/app/lib/seo/site";
@@ -17,7 +22,7 @@ import type { MetadataRoute } from "next";
 
 /**
  * Non pre-renderizzare i chunk a build-time (evita timeout Supabase su Vercel
- * con ~145k URL: pub + recall + medical_device).
+ * con ~145k+ URL: pub + recall + medical_device + docs).
  * L'indice `/sitemap.xml` resta la fonte di verità per i crawler.
  */
 export const dynamic = "force-dynamic";
@@ -61,18 +66,25 @@ export default async function sitemap(props: {
       changeFrequency: "weekly",
       priority: 1,
     });
+    entries.push({
+      url: `${SITE_URL}/docs/search`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.7,
+    });
   }
 
-  const [pubTotal, recallTotal] = await Promise.all([
+  const [pubTotal, recallTotal, deviceTotal] = await Promise.all([
     safeCount("pub", countPubProductsForSitemap),
     safeCount("recall", countRecallsForSitemap),
+    safeCount("medical_device", countMedicalDevicesForSitemap),
   ]);
-  // device total non serve per il windowing se usiamo devicesBase = pub+recall
   const offset = id * PUB_SITEMAP_CHUNK_SIZE;
   const chunkEnd = offset + PUB_SITEMAP_CHUNK_SIZE;
 
   // Layout: pubs [0, pubTotal), recalls [pubTotal, pub+recall),
-  // medical devices [pub+recall, pub+recall+device).
+  // medical devices [pub+recall, pub+recall+device),
+  // docs [pub+recall+device, ...).
   if (offset < pubTotal) {
     const pubLimit = Math.min(PUB_SITEMAP_CHUNK_SIZE, pubTotal - offset);
     try {
@@ -118,7 +130,10 @@ export default async function sitemap(props: {
   const devicesBase = pubTotal + recallTotal;
   const deviceWindowStart = Math.max(0, offset - devicesBase);
   const deviceWindowEnd = Math.max(0, chunkEnd - devicesBase);
-  const deviceLimit = deviceWindowEnd - deviceWindowStart;
+  const deviceLimit = Math.min(
+    deviceWindowEnd - deviceWindowStart,
+    Math.max(0, deviceTotal - deviceWindowStart)
+  );
   if (deviceLimit > 0) {
     try {
       const devices = await fetchMedicalDeviceSitemapEntries(
@@ -135,6 +150,26 @@ export default async function sitemap(props: {
       }
     } catch (error) {
       console.error(`[sitemap] fetch medical_device chunk ${id} failed:`, error);
+    }
+  }
+
+  const docsBase = pubTotal + recallTotal + deviceTotal;
+  const docsWindowStart = Math.max(0, offset - docsBase);
+  const docsWindowEnd = Math.max(0, chunkEnd - docsBase);
+  const docsLimit = docsWindowEnd - docsWindowStart;
+  if (docsLimit > 0) {
+    try {
+      const docs = await fetchDocSitemapEntries(docsWindowStart, docsLimit);
+      for (const doc of docs) {
+        entries.push({
+          url: `${SITE_URL}${docsPath(doc.slug)}`,
+          lastModified: doc.lastModified,
+          changeFrequency: "weekly",
+          priority: 0.55,
+        });
+      }
+    } catch (error) {
+      console.error(`[sitemap] fetch docs chunk ${id} failed:`, error);
     }
   }
 
