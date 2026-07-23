@@ -1,0 +1,7 @@
+{
+  "headless": true,
+  "max_load_more": 200,
+  "settle_ms": 1200,
+  "max_docs": 1300,
+  "out_json": "kerr_half_run.json"
+}

@@ -1,0 +1,6 @@
+{
+  "upsert": false,
+  "page_size": 199,
+  "min_completeness_ratio": 0.95,
+  "out_json": "ivoclar_dry_full_run.json"
+}

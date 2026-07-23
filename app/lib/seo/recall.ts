@@ -160,11 +160,6 @@ export function getRecallJsonLd(recall: RecallRecord) {
           {
             "@type": "ListItem",
             position: 2,
-            name: "Avvisi di sicurezza",
-          },
-          {
-            "@type": "ListItem",
-            position: 3,
             name,
             item: url,
           },

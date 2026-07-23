@@ -1,0 +1,6 @@
+{
+  "upsert": true,
+  "sds_only": true,
+  "request_delay_sec": 0.35,
+  "out_json": "gc_full_run.json"
+}

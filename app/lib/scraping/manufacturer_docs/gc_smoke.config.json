@@ -1,0 +1,8 @@
+{
+  "upsert": false,
+  "sds_only": true,
+  "categories": ["restore", "cement"],
+  "max_products": 15,
+  "request_delay_sec": 0.35,
+  "out_json": "gc_smoke_run.json"
+}

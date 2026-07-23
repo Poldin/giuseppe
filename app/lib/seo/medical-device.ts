@@ -191,11 +191,6 @@ export function getMedicalDeviceJsonLd(device: MedicalDeviceRecord) {
           {
             "@type": "ListItem",
             position: 2,
-            name: "Dispositivi medici",
-          },
-          {
-            "@type": "ListItem",
-            position: 3,
             name,
             item: url,
           },

@@ -1,0 +1,6 @@
+{
+  "upsert": false,
+  "max_docs": 40,
+  "page_size": 199,
+  "out_json": "ivoclar_smoke_run.json"
+}

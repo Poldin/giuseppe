@@ -1,10 +1,10 @@
 """
-Orchestratore scraping cataloghi e-commerce + Ministero della Salute.
+Orchestratore scraping cataloghi e-commerce + Ministero + docs fabbricante.
 
 Due modalità:
   regionale   → conferma e domande dentro ogni scraper (sempre sequenziale)
   frecciarossa → tutte le domande all'inizio, poi run via --config
-                 e-commerce (≥2) in parallelo; Ministero in sequenza dopo
+                 e-commerce (≥2) in parallelo; Ministero + docs in sequenza dopo
 
 Uso (dal terminale integrato):
   python app/lib/scraping/run_all_scrapers.py
@@ -33,6 +33,10 @@ LOGS_DIR = SCRAPING_DIR / "logs"
 OrchestratorMode = Literal["regionale", "frecciarossa"]
 
 ECOMMERCE_KEYS = frozenset({"dentaltix", "gerho", "dontalia"})
+MINISTRY_KEYS = frozenset({"recalls_medical_device", "medical_devices"})
+MANUFACTURER_DOCS_KEYS = frozenset(
+    {"dentsply_sirona", "kerr_dental", "ivoclar", "gc_dental"}
+)
 STATUS_EVERY_SEC = 30
 TAIL_LINES_ON_FAIL = 40
 
@@ -134,6 +138,39 @@ SCRAPERS: list[dict[str, Any]] = [
         "name": "Medical Devices Ministero",
         "script": "medical_devices_update.py",
         "note": "Repertorio DM — import JSON CND odontoiatrici",
+        "catalog_url": None,
+        "routes": None,
+    },
+    # --- manufacturer docs (/docs/[slug]) — sempre in coda, conferma richiesta ---
+    {
+        "key": "dentsply_sirona",
+        "name": "Dentsply Sirona docs",
+        "script": "manufacturer_docs/dentsply_sirona_scraper.py",
+        "note": "Download Center IT → manufacturer_documents",
+        "catalog_url": None,
+        "routes": None,
+    },
+    {
+        "key": "kerr_dental",
+        "name": "Kerr Dental docs",
+        "script": "manufacturer_docs/kerr_dental_scraper.py",
+        "note": "Download Center IT (Playwright) → manufacturer_documents",
+        "catalog_url": None,
+        "routes": None,
+    },
+    {
+        "key": "ivoclar",
+        "name": "Ivoclar docs",
+        "script": "manufacturer_docs/ivoclar_scraper.py",
+        "note": "Download Center IT (DAM) → manufacturer_documents",
+        "catalog_url": None,
+        "routes": None,
+    },
+    {
+        "key": "gc_dental",
+        "name": "GC Dental docs",
+        "script": "manufacturer_docs/gc_dental_scraper.py",
+        "note": "SDS GC Europe IT → manufacturer_documents",
         "catalog_url": None,
         "routes": None,
     },
@@ -266,6 +303,89 @@ def prompt_medical_devices_config() -> dict[str, Any] | None:
         print(f"  + {path}  (totale {len(files)})")
 
 
+def prompt_dentsply_docs_config() -> dict[str, Any]:
+    print()
+    print("--- Configurazione Dentsply Sirona docs ---")
+    print("pageSize per ogni filtro asset-type (una sola call, no offset)")
+    print('  Invio / "y" → 10000 (catalogo completo IT)')
+    print("  Numero N    → usa N (max 10000)")
+    while True:
+        raw = input("> ").strip().lower()
+        if raw in ("", "y", "yes", "s", "si", "sì"):
+            return {"page_size": 10000}
+        if raw.isdigit():
+            value = int(raw)
+            if 1 <= value <= 10_000:
+                return {"page_size": value}
+            print("Inserisci un numero tra 1 e 10000.")
+            continue
+        print("Invio per 10000, oppure un numero.")
+
+
+def prompt_kerr_docs_config() -> dict[str, Any]:
+    print()
+    print("--- Configurazione Kerr Dental docs ---")
+    print('  Invio / "y" → full catalog + upsert DB')
+    print("  dry        → full senza upsert")
+    print("  headed     → browser visibile + upsert")
+    while True:
+        raw = input("> ").strip().lower()
+        if raw in ("", "y", "yes", "s", "si", "sì"):
+            return {"upsert": True, "out_json": "kerr_full_run.json"}
+        if raw == "dry":
+            return {"upsert": False, "out_json": "kerr_dry_full_run.json"}
+        if raw == "headed":
+            return {
+                "headless": False,
+                "upsert": True,
+                "out_json": "kerr_full_run.json",
+            }
+        print("Invio, dry, o headed.")
+
+
+def prompt_ivoclar_docs_config() -> dict[str, Any]:
+    print()
+    print("--- Configurazione Ivoclar docs ---")
+    print('  Invio / "y" → full catalog + upsert DB')
+    print("  dry        → full senza upsert")
+    print("  smoke      → max 40 docs, no upsert")
+    while True:
+        raw = input("> ").strip().lower()
+        if raw in ("", "y", "yes", "s", "si", "sì"):
+            return {"upsert": True, "out_json": "ivoclar_full_run.json"}
+        if raw == "dry":
+            return {"upsert": False, "out_json": "ivoclar_dry_full_run.json"}
+        if raw == "smoke":
+            return {
+                "upsert": False,
+                "max_docs": 40,
+                "out_json": "ivoclar_smoke_run.json",
+            }
+        print("Invio / dry / smoke")
+
+
+def prompt_gc_docs_config() -> dict[str, Any]:
+    print()
+    print("--- Configurazione GC Dental docs ---")
+    print('  Invio / "y" → tutte le categorie + upsert DB')
+    print("  dry        → tutte le categorie, no upsert")
+    print("  smoke      → restore, max 12 prodotti, no upsert")
+    while True:
+        raw = input("> ").strip().lower()
+        if raw in ("", "y", "yes", "s", "si", "sì"):
+            return {"upsert": True, "out_json": "gc_full_run.json"}
+        if raw == "dry":
+            return {"upsert": False, "out_json": "gc_dry_full_run.json"}
+        if raw == "smoke":
+            return {
+                "upsert": False,
+                "categories": ["restore"],
+                "max_products": 12,
+                "out_json": "gc_smoke_run.json",
+            }
+        print("Invio / dry / smoke")
+
+
 def collect_frecciarossa_plan() -> list[tuple[dict[str, Any], dict[str, Any]]]:
     """Raccoglie config per ogni job abilitato. Ritorna [(scraper, config), ...]."""
     print()
@@ -357,6 +477,22 @@ def collect_frecciarossa_plan() -> list[tuple[dict[str, Any], dict[str, Any]]]:
             planned.append((scraper, md_config))
             continue
 
+        if key == "dentsply_sirona":
+            planned.append((scraper, prompt_dentsply_docs_config()))
+            continue
+
+        if key == "kerr_dental":
+            planned.append((scraper, prompt_kerr_docs_config()))
+            continue
+
+        if key == "ivoclar":
+            planned.append((scraper, prompt_ivoclar_docs_config()))
+            continue
+
+        if key == "gc_dental":
+            planned.append((scraper, prompt_gc_docs_config()))
+            continue
+
         print(f"ERRORE: job non gestito in frecciarossa: {key}")
 
     return planned
@@ -366,14 +502,21 @@ def print_frecciarossa_summary(planned: list[PlannedJob]) -> None:
     print()
     print("=== Riepilogo Frecciarossa ===")
     ecommerce = [s["name"] for s, _ in planned if s["key"] in ECOMMERCE_KEYS]
-    ministry = [s["name"] for s, _ in planned if s["key"] not in ECOMMERCE_KEYS]
+    ministry = [s["name"] for s, _ in planned if s["key"] in MINISTRY_KEYS]
+    docs = [s["name"] for s, _ in planned if s["key"] in MANUFACTURER_DOCS_KEYS]
     if len(ecommerce) >= 2:
+        seq_bits = []
+        if ministry:
+            seq_bits.append("Ministero")
+        if docs:
+            seq_bits.append("docs fabbricante")
+        seq_txt = " + ".join(seq_bits) if seq_bits else "job sequenziali"
         print(
             f"  Parallelismo: e-commerce insieme "
-            f"[{', '.join(ecommerce)}]; Ministero in sequenza dopo"
+            f"[{', '.join(ecommerce)}]; {seq_txt} in sequenza dopo"
         )
-    elif ecommerce and ministry:
-        print("  Ordine: e-commerce, poi Ministero (sequenza)")
+    elif ecommerce and (ministry or docs):
+        print("  Ordine: e-commerce, poi Ministero/docs (sequenza)")
     session_ids: set[str] = set()
     for scraper, config in planned:
         name = scraper["name"]
@@ -409,6 +552,28 @@ def print_frecciarossa_summary(planned: list[PlannedJob]) -> None:
             files = config.get("files") or []
             names = ", ".join(Path(item).name for item in files)
             print(f"  • {name}: {len(files)} file [{names}]")
+        elif scraper["key"] == "dentsply_sirona":
+            print(f"  • {name}: page_size={config.get('page_size', 10000)}")
+        elif scraper["key"] == "kerr_dental":
+            upsert = "upsert" if config.get("upsert") else "dry"
+            headed = ", headed" if config.get("headless") is False else ""
+            print(f"  • {name}: {upsert}{headed}")
+        elif scraper["key"] == "ivoclar":
+            if config.get("max_docs"):
+                detail = f"smoke max_docs={config['max_docs']}"
+            elif config.get("upsert"):
+                detail = "upsert"
+            else:
+                detail = "dry"
+            print(f"  • {name}: {detail}")
+        elif scraper["key"] == "gc_dental":
+            if config.get("max_products"):
+                detail = f"smoke max_products={config['max_products']}"
+            elif config.get("upsert"):
+                detail = "upsert"
+            else:
+                detail = "dry"
+            print(f"  • {name}: {detail}")
         else:
             print(f"  • {name}")
     if session_ids:
@@ -689,7 +854,7 @@ def run_frecciarossa() -> None:
         if failed and sequential_jobs:
             print()
             if not prompt_yes_no(
-                "Alcuni e-commerce hanno fallito. Continuare con Ministero?",
+                "Alcuni e-commerce hanno fallito. Continuare con Ministero/docs?",
                 default=False,
             ):
                 print_riepilogo(completed, [], failed)

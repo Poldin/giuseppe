@@ -1,0 +1,8 @@
+{
+  "headless": true,
+  "max_load_more": 400,
+  "settle_ms": 1200,
+  "min_completeness_ratio": 0.95,
+  "upsert": true,
+  "out_json": "kerr_full_run.json"
+}

@@ -1,0 +1,8 @@
+{
+  "upsert": true,
+  "page_size": 199,
+  "min_completeness_ratio": 0.95,
+  "out_json": "ivoclar_full_run.json",
+  "dc": "it",
+  "locale": "it"
+}
