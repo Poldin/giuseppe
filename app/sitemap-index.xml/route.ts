@@ -9,6 +9,7 @@ import {
   PUB_SITEMAP_CHUNK_SIZE,
 } from "@/app/lib/pub/product";
 import { countRecallsForSitemap } from "@/app/lib/recall/recall";
+import { countVsCombinationsForSitemap } from "@/app/lib/vs/combination";
 import { SITE_URL } from "@/app/lib/seo/site";
 
 /**
@@ -18,12 +19,14 @@ import { SITE_URL } from "@/app/lib/seo/site";
  */
 export async function GET() {
   let pubTotal = 0;
+  let vsTotal = 0;
   let recallTotal = 0;
   let deviceTotal = 0;
   let docsTotal = 0;
   try {
-    [pubTotal, recallTotal, deviceTotal, docsTotal] = await Promise.all([
+    [pubTotal, vsTotal, recallTotal, deviceTotal, docsTotal] = await Promise.all([
       countPubProductsForSitemap(),
+      countVsCombinationsForSitemap(),
       countRecallsForSitemap(),
       countMedicalDevicesForSitemap(),
       countDocsForSitemap(),
@@ -31,7 +34,7 @@ export async function GET() {
   } catch (error) {
     console.error("[sitemap-index] count failed:", error);
   }
-  const total = pubTotal + recallTotal + deviceTotal + docsTotal;
+  const total = pubTotal + vsTotal + recallTotal + deviceTotal + docsTotal;
   const chunks = Math.max(1, Math.ceil(total / PUB_SITEMAP_CHUNK_SIZE));
 
   const entries = Array.from({ length: chunks }, (_, id) => {
@@ -49,7 +52,7 @@ ${entries}
   return new Response(xml, {
     headers: {
       "Content-Type": "application/xml; charset=utf-8",
-      // Indice leggero: totali pub+recall+medical_device+docs; cache edge 1h
+      // Indice leggero: totali pub+vs+recall+medical_device+docs; cache edge 1h
       "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
     },
   });

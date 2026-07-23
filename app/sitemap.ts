@@ -14,15 +14,20 @@ import {
   countRecallsForSitemap,
   fetchRecallSitemapEntries,
 } from "@/app/lib/recall/recall";
+import {
+  countVsCombinationsForSitemap,
+  fetchVsSitemapEntries,
+} from "@/app/lib/vs/combination";
 import { docsPath } from "@/app/lib/seo/docs";
 import { medicalDevicePath } from "@/app/lib/seo/medical-device";
 import { recallPath } from "@/app/lib/seo/recall";
+import { vsCombinationPath } from "@/app/lib/seo/vs-combination";
 import { SITE_URL } from "@/app/lib/seo/site";
 import type { MetadataRoute } from "next";
 
 /**
  * Non pre-renderizzare i chunk a build-time (evita timeout Supabase su Vercel
- * con ~145k+ URL: pub + recall + medical_device + docs).
+ * con molte URL: pub + vs + recall + medical_device + docs).
  * L'indice `/sitemap.xml` resta la fonte di verità per i crawler.
  */
 export const dynamic = "force-dynamic";
@@ -74,17 +79,20 @@ export default async function sitemap(props: {
     });
   }
 
-  const [pubTotal, recallTotal, deviceTotal] = await Promise.all([
+  const [pubTotal, vsTotal, recallTotal, deviceTotal] = await Promise.all([
     safeCount("pub", countPubProductsForSitemap),
+    safeCount("vs", countVsCombinationsForSitemap),
     safeCount("recall", countRecallsForSitemap),
     safeCount("medical_device", countMedicalDevicesForSitemap),
   ]);
   const offset = id * PUB_SITEMAP_CHUNK_SIZE;
   const chunkEnd = offset + PUB_SITEMAP_CHUNK_SIZE;
 
-  // Layout: pubs [0, pubTotal), recalls [pubTotal, pub+recall),
-  // medical devices [pub+recall, pub+recall+device),
-  // docs [pub+recall+device, ...).
+  // Layout: pubs [0, pubTotal),
+  // vs [pubTotal, pub+vs),
+  // recalls [pub+vs, …),
+  // medical devices …,
+  // docs …
   if (offset < pubTotal) {
     const pubLimit = Math.min(PUB_SITEMAP_CHUNK_SIZE, pubTotal - offset);
     try {
@@ -102,8 +110,32 @@ export default async function sitemap(props: {
     }
   }
 
-  const recallWindowStart = Math.max(0, offset - pubTotal);
-  const recallWindowEnd = Math.max(0, chunkEnd - pubTotal);
+  const vsBase = pubTotal;
+  const vsWindowStart = Math.max(0, offset - vsBase);
+  const vsWindowEnd = Math.max(0, chunkEnd - vsBase);
+  const vsLimit = Math.min(
+    vsWindowEnd - vsWindowStart,
+    Math.max(0, vsTotal - vsWindowStart)
+  );
+  if (vsLimit > 0) {
+    try {
+      const combinations = await fetchVsSitemapEntries(vsWindowStart, vsLimit);
+      for (const combo of combinations) {
+        entries.push({
+          url: `${SITE_URL}${vsCombinationPath(combo.slug)}`,
+          lastModified: combo.lastModified,
+          changeFrequency: "daily",
+          priority: 0.65,
+        });
+      }
+    } catch (error) {
+      console.error(`[sitemap] fetch vs chunk ${id} failed:`, error);
+    }
+  }
+
+  const recallBase = pubTotal + vsTotal;
+  const recallWindowStart = Math.max(0, offset - recallBase);
+  const recallWindowEnd = Math.max(0, chunkEnd - recallBase);
   const recallLimit = Math.min(
     recallWindowEnd - recallWindowStart,
     Math.max(0, recallTotal - recallWindowStart)
@@ -127,7 +159,7 @@ export default async function sitemap(props: {
     }
   }
 
-  const devicesBase = pubTotal + recallTotal;
+  const devicesBase = pubTotal + vsTotal + recallTotal;
   const deviceWindowStart = Math.max(0, offset - devicesBase);
   const deviceWindowEnd = Math.max(0, chunkEnd - devicesBase);
   const deviceLimit = Math.min(
@@ -153,7 +185,7 @@ export default async function sitemap(props: {
     }
   }
 
-  const docsBase = pubTotal + recallTotal + deviceTotal;
+  const docsBase = pubTotal + vsTotal + recallTotal + deviceTotal;
   const docsWindowStart = Math.max(0, offset - docsBase);
   const docsWindowEnd = Math.max(0, chunkEnd - docsBase);
   const docsLimit = docsWindowEnd - docsWindowStart;

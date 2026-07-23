@@ -280,3 +280,19 @@ CREATE TABLE public.manufacturer_documents (
   CONSTRAINT manufacturer_documents_pkey PRIMARY KEY (id),
   CONSTRAINT manufacturer_documents_source_id_fkey FOREIGN KEY (source_id) REFERENCES public.document_sources(id)
 );
+CREATE TABLE public.product_combinations (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  slug text UNIQUE,
+  other jsonb,
+  CONSTRAINT product_combinations_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.link_combinations_scraped_products (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  combination_id uuid,
+  scraped_product_id uuid,
+  CONSTRAINT link_combinations_scraped_products_pkey PRIMARY KEY (id),
+  CONSTRAINT link_combinations_scraped_products_combination_id_fkey FOREIGN KEY (combination_id) REFERENCES public.product_combinations(id),
+  CONSTRAINT link_combinations_scraped_products_scraped_product_id_fkey FOREIGN KEY (scraped_product_id) REFERENCES public.scraped_product(id)
+);
