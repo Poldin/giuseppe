@@ -4,6 +4,11 @@ import { cache } from "react";
 const SUPABASE_PAGE_SIZE = 1000;
 /** URLs per sitemap file (under Google's 50k limit). */
 export const PUB_SITEMAP_CHUNK_SIZE = 10_000;
+/**
+ * Chunk ID noti a build (`generateSitemaps`) e tetto per `/sitemap.xml`.
+ * Headroom ~320k URL @ 10k/chunk. I chunk oltre il totale reale restituiscono [].
+ */
+export const MAX_SITEMAP_CHUNKS = 32;
 
 export type PubProductEcommerce = {
   id: string;

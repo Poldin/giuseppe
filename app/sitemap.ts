@@ -8,6 +8,7 @@ import {
 import {
   countPubProductsForSitemap,
   fetchPubSitemapEntries,
+  MAX_SITEMAP_CHUNKS,
   PUB_SITEMAP_CHUNK_SIZE,
 } from "@/app/lib/pub/product";
 import {
@@ -32,12 +33,6 @@ import type { MetadataRoute } from "next";
  */
 export const dynamic = "force-dynamic";
 
-/**
- * ID noti a build senza query DB. Headroom ~320k URL @ 10k/chunk.
- * I chunk oltre il totale reale restituiscono [] a runtime.
- */
-const MAX_SITEMAP_CHUNKS = 32;
-
 export async function generateSitemaps() {
   return Array.from({ length: MAX_SITEMAP_CHUNKS }, (_, id) => ({ id }));
 }
@@ -46,12 +41,24 @@ async function safeCount(
   label: string,
   fn: () => Promise<number>
 ): Promise<number> {
-  try {
-    return await fn();
-  } catch (error) {
-    console.error(`[sitemap] count ${label} failed:`, error);
-    return 0;
+  const attempts = 3;
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      console.error(
+        `[sitemap] count ${label} failed (attempt ${attempt}/${attempts}):`,
+        error
+      );
+      if (attempt < attempts) {
+        await new Promise((r) => setTimeout(r, 150 * attempt));
+      }
+    }
   }
+  console.error(`[sitemap] count ${label} gave up:`, lastError);
+  return 0;
 }
 
 export default async function sitemap(props: {
