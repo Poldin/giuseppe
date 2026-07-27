@@ -21,6 +21,7 @@ import {
 } from "@/app/lib/vs/combination";
 import { docsPath } from "@/app/lib/seo/docs";
 import { medicalDevicePath } from "@/app/lib/seo/medical-device";
+import { getNotazioneDentaleSitemapEntries } from "@/app/lib/seo/notazione-dentale";
 import { recallPath } from "@/app/lib/seo/recall";
 import { vsCombinationPath } from "@/app/lib/seo/vs-combination";
 import { SITE_URL } from "@/app/lib/seo/site";
@@ -28,7 +29,7 @@ import type { MetadataRoute } from "next";
 
 /**
  * Non pre-renderizzare i chunk a build-time (evita timeout Supabase su Vercel
- * con molte URL: pub + vs + recall + medical_device + docs).
+ * con molte URL: pub + vs + recall + medical_device + docs + notazione-dentale).
  * L'indice `/sitemap.xml` resta la fonte di verità per i crawler.
  */
 export const dynamic = "force-dynamic";
@@ -84,6 +85,14 @@ export default async function sitemap(props: {
       changeFrequency: "weekly",
       priority: 0.7,
     });
+    // Hub + 32 denti: dati statici, niente DB.
+    for (const entry of getNotazioneDentaleSitemapEntries()) {
+      entries.push({
+        url: entry.url,
+        changeFrequency: entry.changeFrequency,
+        priority: entry.priority,
+      });
+    }
   }
 
   const [pubTotal, vsTotal, recallTotal, deviceTotal] = await Promise.all([
