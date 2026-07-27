@@ -1,4 +1,5 @@
 import { ChatSponsoredBanner } from "@/app/components/chat/ChatSponsoredBanner";
+import { ToothSelector } from "@/app/components/notazione-dentale/ToothSelector";
 import {
   palmerNotation,
   teethGroupedByQuadrant,
@@ -94,6 +95,19 @@ export default function NotazioneDentaleHubPage() {
               Universal (ADA) e Palmer. Apri una scheda per dettagli e FAQ.
             </p>
           </header>
+
+          <section
+            aria-labelledby="hub-tooth-selector-heading"
+            className="mt-10"
+          >
+            <h2
+              id="hub-tooth-selector-heading"
+              className="mb-4 text-lg font-black uppercase tracking-tighter"
+            >
+              Esplora un dente
+            </h2>
+            <ToothSelector selectId="hub-tooth-select" />
+          </section>
 
           {groups.map((group) => (
             <section

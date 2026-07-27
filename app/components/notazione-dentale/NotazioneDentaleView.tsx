@@ -101,6 +101,19 @@ export function NotazioneDentaleView({ tooth }: { tooth: ToothRecord }) {
           </dl>
         </section>
 
+        <section
+          aria-labelledby="tooth-selector-heading"
+          className="mt-14 border-t border-zinc-100 pt-8 dark:border-zinc-900"
+        >
+          <h2
+            id="tooth-selector-heading"
+            className="mb-4 text-lg font-black uppercase tracking-tighter"
+          >
+            Esplora un altro dente
+          </h2>
+          <ToothSelector currentSlug={tooth.slug} />
+        </section>
+
         {siblings.length > 0 ? (
           <section className="mt-10" aria-label="Stesso quadrante">
             <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-zinc-500">
@@ -153,19 +166,6 @@ export function NotazioneDentaleView({ tooth }: { tooth: ToothRecord }) {
             </div>
           </section>
         ) : null}
-
-        <section
-          aria-labelledby="tooth-selector-heading"
-          className="mt-14 border-t border-zinc-100 pt-8 dark:border-zinc-900"
-        >
-          <h2
-            id="tooth-selector-heading"
-            className="mb-4 text-lg font-black uppercase tracking-tighter"
-          >
-            Esplora un altro dente
-          </h2>
-          <ToothSelector currentSlug={tooth.slug} />
-        </section>
       </main>
     </div>
   );

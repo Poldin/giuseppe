@@ -11,7 +11,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 type ToothSelectorProps = {
-  currentSlug: string;
+  /** Slug della pagina corrente; omesso sull’hub. */
+  currentSlug?: string;
+  selectId?: string;
 };
 
 function ToothPreview({ tooth }: { tooth: ToothRecord }) {
@@ -71,22 +73,26 @@ function ToothPreview({ tooth }: { tooth: ToothRecord }) {
   );
 }
 
-export function ToothSelector({ currentSlug }: ToothSelectorProps) {
+export function ToothSelector({
+  currentSlug,
+  selectId = "tooth-select",
+}: ToothSelectorProps) {
   const router = useRouter();
   const teeth = getAllTeeth();
-  const [selectedSlug, setSelectedSlug] = useState(currentSlug);
+  const initialSlug = currentSlug ?? teeth[0]?.slug ?? "";
+  const [selectedSlug, setSelectedSlug] = useState(initialSlug);
   const selected = getToothBySlug(selectedSlug) ?? teeth[0];
 
   return (
     <div className="flex flex-col gap-2">
       <label
-        htmlFor="tooth-select"
+        htmlFor={selectId}
         className="text-sm font-bold uppercase tracking-wide text-zinc-500"
       >
         Seleziona un dente
       </label>
       <select
-        id="tooth-select"
+        id={selectId}
         value={selectedSlug}
         onChange={(e) => {
           const slug = e.target.value;
