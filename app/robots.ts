@@ -3,7 +3,8 @@ import type { MetadataRoute } from "next";
 
 /**
  * SEO pubbliche indicizzate via /sitemap.xml:
- * /pub/*, /vs/*, /recall/*, /medical_device/*, /docs/*, /notazione-dentale/*
+ * /pub/*, /vs/*, /recall/*, /medical_device/*, /docs/*, /notazione-dentale/*,
+ * /lista-trasparenza, /equivalenti/*, /principio-attivo/*, /farmaco/*, /atc/*, /ditta/*
  * (allow "/" le include; chat/warehouse/api restano fuori)
  */
 export default function robots(): MetadataRoute.Robots {

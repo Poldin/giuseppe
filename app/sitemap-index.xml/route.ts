@@ -1,4 +1,11 @@
 import {
+  countAifaAtcForSitemap,
+  countAifaCompaniesForSitemap,
+  countAifaGroupsForSitemap,
+  countAifaIngredientsForSitemap,
+  countAifaMedicinesForSitemap,
+} from "@/app/lib/aifa/queries";
+import {
   countDocsForSitemap,
 } from "@/app/lib/docs/document";
 import {
@@ -75,8 +82,32 @@ export async function GET() {
     countMedicalDevicesForSitemap
   );
   const docsTotal = await safeCount("docs", countDocsForSitemap);
+  const aifaGroupTotal = await safeCount("aifa_groups", countAifaGroupsForSitemap);
+  const aifaIngredientTotal = await safeCount(
+    "aifa_ingredients",
+    countAifaIngredientsForSitemap
+  );
+  const aifaMedicineTotal = await safeCount(
+    "aifa_medicines",
+    countAifaMedicinesForSitemap
+  );
+  const aifaCompanyTotal = await safeCount(
+    "aifa_companies",
+    countAifaCompaniesForSitemap
+  );
+  const aifaAtcTotal = await safeCount("aifa_atc", countAifaAtcForSitemap);
 
-  const total = pubTotal + vsTotal + recallTotal + deviceTotal + docsTotal;
+  const total =
+    pubTotal +
+    vsTotal +
+    recallTotal +
+    deviceTotal +
+    docsTotal +
+    aifaGroupTotal +
+    aifaIngredientTotal +
+    aifaMedicineTotal +
+    aifaCompanyTotal +
+    aifaAtcTotal;
   const chunks = chunkCountForTotal(total);
 
   console.info("[sitemap-index] totals", {
@@ -85,6 +116,11 @@ export async function GET() {
     recallTotal,
     deviceTotal,
     docsTotal,
+    aifaGroupTotal,
+    aifaIngredientTotal,
+    aifaMedicineTotal,
+    aifaCompanyTotal,
+    aifaAtcTotal,
     total,
     chunks,
   });

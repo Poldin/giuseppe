@@ -296,3 +296,100 @@ CREATE TABLE public.link_combinations_scraped_products (
   CONSTRAINT link_combinations_scraped_products_combination_id_fkey FOREIGN KEY (combination_id) REFERENCES public.product_combinations(id),
   CONSTRAINT link_combinations_scraped_products_scraped_product_id_fkey FOREIGN KEY (scraped_product_id) REFERENCES public.scraped_product(id)
 );
+CREATE TABLE public.aifa_releases (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  published_on date NOT NULL UNIQUE,
+  source_path text,
+  source_file_name text,
+  file_checksum text,
+  row_count integer,
+  imported_at timestamp with time zone NOT NULL DEFAULT now(),
+  other jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT aifa_releases_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.aifa_active_ingredients (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  name text NOT NULL UNIQUE,
+  slug text NOT NULL UNIQUE,
+  other jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT aifa_active_ingredients_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.aifa_atc_codes (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  code text NOT NULL UNIQUE,
+  slug text NOT NULL UNIQUE,
+  other jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT aifa_atc_codes_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.aifa_companies (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  name text NOT NULL UNIQUE,
+  slug text NOT NULL UNIQUE,
+  other jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT aifa_companies_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.aifa_equivalence_groups (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  code text NOT NULL UNIQUE,
+  slug text NOT NULL UNIQUE,
+  active_ingredient_id uuid,
+  atc_code_id uuid,
+  reference_pack_label text,
+  other jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT aifa_equivalence_groups_pkey PRIMARY KEY (id),
+  CONSTRAINT aifa_equivalence_groups_active_ingredient_id_fkey FOREIGN KEY (active_ingredient_id) REFERENCES public.aifa_active_ingredients(id),
+  CONSTRAINT aifa_equivalence_groups_atc_code_id_fkey FOREIGN KEY (atc_code_id) REFERENCES public.aifa_atc_codes(id)
+);
+CREATE TABLE public.aifa_medicines (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  aic text NOT NULL UNIQUE,
+  slug text NOT NULL UNIQUE,
+  name text NOT NULL,
+  pack_description text,
+  company_id uuid,
+  active_ingredient_id uuid,
+  equivalence_group_id uuid,
+  atc_code_id uuid,
+  prezzo_riferimento_ssn numeric,
+  prezzo_pubblico numeric,
+  differenza numeric,
+  nota text,
+  release_id uuid,
+  first_release_id uuid,
+  is_active boolean NOT NULL DEFAULT true,
+  other jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT aifa_medicines_pkey PRIMARY KEY (id),
+  CONSTRAINT aifa_medicines_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.aifa_companies(id),
+  CONSTRAINT aifa_medicines_active_ingredient_id_fkey FOREIGN KEY (active_ingredient_id) REFERENCES public.aifa_active_ingredients(id),
+  CONSTRAINT aifa_medicines_equivalence_group_id_fkey FOREIGN KEY (equivalence_group_id) REFERENCES public.aifa_equivalence_groups(id),
+  CONSTRAINT aifa_medicines_atc_code_id_fkey FOREIGN KEY (atc_code_id) REFERENCES public.aifa_atc_codes(id),
+  CONSTRAINT aifa_medicines_release_id_fkey FOREIGN KEY (release_id) REFERENCES public.aifa_releases(id),
+  CONSTRAINT aifa_medicines_first_release_id_fkey FOREIGN KEY (first_release_id) REFERENCES public.aifa_releases(id)
+);
+CREATE TABLE public.aifa_medicine_price_history (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  medicine_id uuid NOT NULL,
+  aic text NOT NULL,
+  release_id uuid NOT NULL,
+  published_on date NOT NULL,
+  prezzo_riferimento_ssn numeric,
+  prezzo_pubblico numeric,
+  differenza numeric,
+  nota text,
+  equivalence_group_code text,
+  CONSTRAINT aifa_medicine_price_history_pkey PRIMARY KEY (id),
+  CONSTRAINT aifa_medicine_price_history_medicine_id_fkey FOREIGN KEY (medicine_id) REFERENCES public.aifa_medicines(id),
+  CONSTRAINT aifa_medicine_price_history_release_id_fkey FOREIGN KEY (release_id) REFERENCES public.aifa_releases(id)
+);

@@ -1,4 +1,17 @@
 import {
+  countAifaAtcForSitemap,
+  countAifaCompaniesForSitemap,
+  countAifaGroupsForSitemap,
+  countAifaIngredientsForSitemap,
+  countAifaMedicinesForSitemap,
+  fetchAifaAtcSitemapEntries,
+  fetchAifaCompanySitemapEntries,
+  fetchAifaGroupSitemapEntries,
+  fetchAifaIngredientSitemapEntries,
+  fetchAifaMedicineSitemapEntries,
+} from "@/app/lib/aifa/queries";
+import {
+  countDocsForSitemap,
   fetchDocSitemapEntries,
 } from "@/app/lib/docs/document";
 import {
@@ -19,6 +32,14 @@ import {
   countVsCombinationsForSitemap,
   fetchVsSitemapEntries,
 } from "@/app/lib/vs/combination";
+import {
+  atcPath,
+  dittaPath,
+  equivalentiPath,
+  farmacoPath,
+  listaTrasparenzaPath,
+  principioAttivoPath,
+} from "@/app/lib/seo/aifa";
 import { docsPath } from "@/app/lib/seo/docs";
 import { medicalDevicePath } from "@/app/lib/seo/medical-device";
 import { getNotazioneDentaleSitemapEntries } from "@/app/lib/seo/notazione-dentale";
@@ -85,6 +106,12 @@ export default async function sitemap(props: {
       changeFrequency: "weekly",
       priority: 0.7,
     });
+    entries.push({
+      url: `${SITE_URL}${listaTrasparenzaPath()}`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.8,
+    });
     // Hub + 32 denti: dati statici, niente DB.
     for (const entry of getNotazioneDentaleSitemapEntries()) {
       entries.push({
@@ -95,11 +122,28 @@ export default async function sitemap(props: {
     }
   }
 
-  const [pubTotal, vsTotal, recallTotal, deviceTotal] = await Promise.all([
+  const [
+    pubTotal,
+    vsTotal,
+    recallTotal,
+    deviceTotal,
+    docsTotal,
+    aifaGroupTotal,
+    aifaIngredientTotal,
+    aifaMedicineTotal,
+    aifaCompanyTotal,
+    aifaAtcTotal,
+  ] = await Promise.all([
     safeCount("pub", countPubProductsForSitemap),
     safeCount("vs", countVsCombinationsForSitemap),
     safeCount("recall", countRecallsForSitemap),
     safeCount("medical_device", countMedicalDevicesForSitemap),
+    safeCount("docs", countDocsForSitemap),
+    safeCount("aifa_groups", countAifaGroupsForSitemap),
+    safeCount("aifa_ingredients", countAifaIngredientsForSitemap),
+    safeCount("aifa_medicines", countAifaMedicinesForSitemap),
+    safeCount("aifa_companies", countAifaCompaniesForSitemap),
+    safeCount("aifa_atc", countAifaAtcForSitemap),
   ]);
   const offset = id * PUB_SITEMAP_CHUNK_SIZE;
   const chunkEnd = offset + PUB_SITEMAP_CHUNK_SIZE;
@@ -204,7 +248,10 @@ export default async function sitemap(props: {
   const docsBase = pubTotal + vsTotal + recallTotal + deviceTotal;
   const docsWindowStart = Math.max(0, offset - docsBase);
   const docsWindowEnd = Math.max(0, chunkEnd - docsBase);
-  const docsLimit = docsWindowEnd - docsWindowStart;
+  const docsLimit = Math.min(
+    docsWindowEnd - docsWindowStart,
+    Math.max(0, docsTotal - docsWindowStart)
+  );
   if (docsLimit > 0) {
     try {
       const docs = await fetchDocSitemapEntries(docsWindowStart, docsLimit);
@@ -219,6 +266,79 @@ export default async function sitemap(props: {
     } catch (error) {
       console.error(`[sitemap] fetch docs chunk ${id} failed:`, error);
     }
+  }
+
+  const aifaSegments: {
+    label: string;
+    total: number;
+    fetch: (
+      start: number,
+      limit: number
+    ) => Promise<{ slug: string; lastModified: Date | undefined }[]>;
+    path: (slug: string) => string;
+    priority: number;
+  }[] = [
+    {
+      label: "aifa_groups",
+      total: aifaGroupTotal,
+      fetch: fetchAifaGroupSitemapEntries,
+      path: equivalentiPath,
+      priority: 0.75,
+    },
+    {
+      label: "aifa_ingredients",
+      total: aifaIngredientTotal,
+      fetch: fetchAifaIngredientSitemapEntries,
+      path: principioAttivoPath,
+      priority: 0.7,
+    },
+    {
+      label: "aifa_medicines",
+      total: aifaMedicineTotal,
+      fetch: fetchAifaMedicineSitemapEntries,
+      path: farmacoPath,
+      priority: 0.65,
+    },
+    {
+      label: "aifa_companies",
+      total: aifaCompanyTotal,
+      fetch: fetchAifaCompanySitemapEntries,
+      path: dittaPath,
+      priority: 0.45,
+    },
+    {
+      label: "aifa_atc",
+      total: aifaAtcTotal,
+      fetch: fetchAifaAtcSitemapEntries,
+      path: atcPath,
+      priority: 0.45,
+    },
+  ];
+
+  let aifaBase = docsBase + docsTotal;
+  for (const seg of aifaSegments) {
+    const windowStart = Math.max(0, offset - aifaBase);
+    const windowEnd = Math.max(0, chunkEnd - aifaBase);
+    const limit = Math.min(
+      windowEnd - windowStart,
+      Math.max(0, seg.total - windowStart)
+    );
+    if (limit > 0) {
+      try {
+        const rows = await seg.fetch(windowStart, limit);
+        for (const row of rows) {
+          entries.push({
+            url: `${SITE_URL}${seg.path(row.slug)}`,
+            lastModified: row.lastModified,
+            changeFrequency: "weekly",
+            priority: seg.priority,
+          });
+        }
+      } catch (error) {
+        console.error(`[sitemap] fetch ${seg.label} chunk ${id} failed:`, error);
+      }
+    }
+    aifaBase += seg.total;
   }
 
   return entries;
