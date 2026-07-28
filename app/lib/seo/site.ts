@@ -4,7 +4,12 @@ export const SITE_NAME = "Giuseppe";
 export const SITE_EMAIL = "info@giuseppeacquisti.it";
 
 /** Ecommerce attualmente confrontati. */
-export const COMPARED_ECOMMERCES = ["Gerhò", "Dontalia", "Dentaltix"] as const;
+export const COMPARED_ECOMMERCES = [
+  "Gerhò",
+  "Dontalia",
+  "Dentaltix",
+  "Abutment Compatibili",
+] as const;
 
 const MONTHS_IT = [
   "gennaio",
@@ -64,7 +69,7 @@ export function getLastCatalogUpdateLabel(now = new Date()): string {
  */
 export function getPriceTransparency(now = new Date()): string {
   const lastUpdate = getLastCatalogUpdateLabel(now);
-  return `I prezzi e i prodotti mostrati si basano su un catalogo aggiornato quotidianamente da Gerhò, Dontalia e Dentaltix. Ultimo aggiornamento del catalogo: ${lastUpdate}. Il confronto usa dati di catalogo aggiornati ogni giorno; il prezzo finale e l’IVA vanno sempre verificati sul sito del rivenditore al momento dell’acquisto.`;
+  return `I prezzi e i prodotti mostrati si basano su un catalogo aggiornato quotidianamente da Gerhò, Dontalia, Dentaltix e Abutment Compatibili. Ultimo aggiornamento del catalogo: ${lastUpdate}. Il confronto usa dati di catalogo aggiornati ogni giorno; il prezzo finale e l’IVA vanno sempre verificati sul sito del rivenditore al momento dell’acquisto.`;
 }
 
 /**
@@ -72,7 +77,7 @@ export function getPriceTransparency(now = new Date()): string {
  * Deve restare allineata a ciò che Giuseppe fa davvero in prodotto.
  */
 export const SITE_DESCRIPTION =
-  "Giuseppe è un servizio gratuito di confronto prezzi e prodotti per studi dentistici. Indichi i materiali e i consumabili che ti servono: Giuseppe cerca tra oltre 100.000 articoli e, ad oggi, confronta prodotti da Gerhò, Dontalia e Dentaltix. I prezzi e i prodotti mostrati si basano su un catalogo aggiornato quotidianamente; il prezzo finale e l’IVA vanno sempre verificati sul sito del rivenditore al momento dell’acquisto. Riceve dalle 500 alle 2.000 richieste giornaliere di comparazione, con un tempo medio di confronto tra 2,3 e 4,9 secondi. Come funziona: 1) indica la lista dei prodotti che ti servono in studio; 2) Giuseppe ricerca sui principali rivenditori e mostra le migliori offerte; 3) selezioni i prodotti migliori per ogni esigenza e componi l'ordine migliore; 4) acquisti in tutta sicurezza direttamente dai rivenditori. Contatto: info@giuseppeacquisti.it.";
+  "Giuseppe è un servizio gratuito di confronto prezzi e prodotti per studi dentistici. Indichi i materiali e i consumabili che ti servono: Giuseppe cerca tra oltre 100.000 articoli e, ad oggi, confronta prodotti da Gerhò, Dontalia, Dentaltix e Abutment Compatibili. I prezzi e i prodotti mostrati si basano su un catalogo aggiornato quotidianamente; il prezzo finale e l’IVA vanno sempre verificati sul sito del rivenditore al momento dell’acquisto. Riceve dalle 500 alle 2.000 richieste giornaliere di comparazione, con un tempo medio di confronto tra 2,3 e 4,9 secondi. Come funziona: 1) indica la lista dei prodotti che ti servono in studio; 2) Giuseppe ricerca sui principali rivenditori e mostra le migliori offerte; 3) selezioni i prodotti migliori per ogni esigenza e componi l'ordine migliore; 4) acquisti in tutta sicurezza direttamente dai rivenditori. Contatto: info@giuseppeacquisti.it.";
 
 export const SITE_TITLE =
   "Giuseppe — Confronto prezzi e prodotti per studi dentistici";
@@ -89,6 +94,7 @@ export const SITE_KEYWORDS = [
   "Gerhò",
   "Dontalia",
   "Dentaltix",
+  "Abutment Compatibili",
 ] as const;
 
 /** Passi "Come funziona" allineati alla homepage. */
@@ -132,7 +138,7 @@ export function getFaqItems(now = new Date()): FaqItem[] {
     {
       question: "Quali ecommerce confronta oggi Giuseppe?",
       answer:
-        "Ad oggi Giuseppe confronta prodotti da Gerhò, Dontalia e Dentaltix, su un catalogo di oltre 100.000 articoli disponibili.",
+        "Ad oggi Giuseppe confronta prodotti da Gerhò, Dontalia, Dentaltix e Abutment Compatibili, su un catalogo di oltre 100.000 articoli disponibili.",
     },
     {
       question: "I prezzi sono aggiornati? Includono l’IVA?",

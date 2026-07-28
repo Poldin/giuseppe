@@ -32,7 +32,7 @@ LOGS_DIR = SCRAPING_DIR / "logs"
 
 OrchestratorMode = Literal["regionale", "frecciarossa"]
 
-ECOMMERCE_KEYS = frozenset({"dentaltix", "gerho", "dontalia"})
+ECOMMERCE_KEYS = frozenset({"dentaltix", "gerho", "dontalia", "abutment_compatibili"})
 MINISTRY_KEYS = frozenset({"recalls_medical_device", "medical_devices"})
 MANUFACTURER_DOCS_KEYS = frozenset(
     {"dentsply_sirona", "kerr_dental", "ivoclar", "gc_dental"}
@@ -126,6 +126,35 @@ SCRAPERS: list[dict[str, Any]] = [
         ],
     },
     {
+        "key": "abutment_compatibili",
+        "name": "Abutment Compatibili",
+        "script": "abutment_compatibili_local_scraper.py",
+        "note": "PRODOTTO, MONCONI, RHEIN83, FLUSSO DIGITALE",
+        "catalog_url": "https://abutmentcompatibili.com/prodotto.html",
+        "routes": [
+            {
+                "key": "prodotto",
+                "label": "PRODOTTO",
+                "url": "https://abutmentcompatibili.com/prodotto.html",
+            },
+            {
+                "key": "monconi",
+                "label": "MONCONI",
+                "url": "https://abutmentcompatibili.com/monconi-abutment-compatibili.html",
+            },
+            {
+                "key": "rhein83",
+                "label": "RHEIN83",
+                "url": "https://abutmentcompatibili.com/rhein83-2.html",
+            },
+            {
+                "key": "flusso_digitale",
+                "label": "FLUSSO DIGITALE",
+                "url": "https://abutmentcompatibili.com/flusso-digitale.html",
+            },
+        ],
+    },
+    {
         "key": "recalls_medical_device",
         "name": "Recalls Ministero",
         "script": "recalls_medical_device_scraper.py",
@@ -204,10 +233,10 @@ def prompt_session_id_global() -> str:
     return session_id
 
 
-def prompt_start_page_shared() -> int:
+def prompt_start_page_shared(label: str) -> int:
     print()
     print(
-        f"Dontalia: da quale pagina partire? "
+        f"{label}: da quale pagina partire? "
         f"(stop dopo {EMPTY_STREAK_STOP} pagine vuote di fila)"
     )
     print('  Invio / "y" → pagina 1')
@@ -435,18 +464,18 @@ def collect_frecciarossa_plan() -> list[tuple[dict[str, Any], dict[str, Any]]]:
             planned.append((scraper, config))
             continue
 
-        if key == "dontalia":
+        if key in ("dontalia", "abutment_compatibili"):
             routes_meta = scraper["routes"] or []
             routes = []
             for route in routes_meta:
-                if prompt_yes_no(f"Dontalia: eseguire rotta {route['label']}?"):
+                if prompt_yes_no(f"{name}: eseguire rotta {route['label']}?"):
                     routes.append(route["key"])
             if not routes:
                 print(f"Nessuna rotta per {name}, saltato.")
                 continue
 
             assert session_id is not None
-            start_page = prompt_start_page_shared()
+            start_page = prompt_start_page_shared(name)
             planned.append(
                 (
                     scraper,
@@ -526,7 +555,7 @@ def print_frecciarossa_summary(planned: list[PlannedJob]) -> None:
                 )
             print(f"  • {name}: rotte [{routes}]; {detail}")
             session_ids.add(config["session_id"])
-        elif scraper["key"] == "dontalia":
+        elif scraper["key"] in ("dontalia", "abutment_compatibili"):
             routes = ", ".join(config["routes"])
             print(
                 f"  • {name}: rotte [{routes}]; "
@@ -655,7 +684,7 @@ def tail_log(path: Path, max_lines: int = TAIL_LINES_ON_FAIL) -> list[str]:
 
 
 def run_ecommerce_parallel(jobs: list[PlannedJob]) -> list[ParallelJobResult]:
-    """Esegue i 3 e-commerce in parallelo; console = solo stato, dettagli su file."""
+    """Esegue gli e-commerce in parallelo; console = solo stato, dettagli su file."""
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_dir = LOGS_DIR / f"frecciarossa_{stamp}"
     run_dir.mkdir(parents=True, exist_ok=True)
