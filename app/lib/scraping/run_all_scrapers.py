@@ -32,7 +32,9 @@ LOGS_DIR = SCRAPING_DIR / "logs"
 
 OrchestratorMode = Literal["regionale", "frecciarossa"]
 
-ECOMMERCE_KEYS = frozenset({"dentaltix", "gerho", "dontalia", "abutment_compatibili"})
+ECOMMERCE_KEYS = frozenset(
+    {"dentaltix", "gerho", "dontalia", "abutment_compatibili", "dess", "niba"}
+)
 MINISTRY_KEYS = frozenset({"recalls_medical_device", "medical_devices"})
 MANUFACTURER_DOCS_KEYS = frozenset(
     {"dentsply_sirona", "kerr_dental", "ivoclar", "gc_dental"}
@@ -151,6 +153,44 @@ SCRAPERS: list[dict[str, Any]] = [
                 "key": "flusso_digitale",
                 "label": "FLUSSO DIGITALE",
                 "url": "https://abutmentcompatibili.com/flusso-digitale.html",
+            },
+        ],
+    },
+    {
+        "key": "dess",
+        "name": "DESS",
+        "script": "dess_local_scraper.py",
+        "note": "PRODUCTS, IMPLANTS, IMPLANT_BRANDS",
+        "catalog_url": "https://www.dessdental.com/it-it/products",
+        "routes": [
+            {
+                "key": "products",
+                "label": "PRODUCTS",
+                "url": "https://www.dessdental.com/it-it/products",
+            },
+            {
+                "key": "implants",
+                "label": "IMPLANTS",
+                "url": "https://www.dessdental.com/it-it/implants",
+            },
+            {
+                "key": "implant_brands",
+                "label": "IMPLANT_BRANDS",
+                "url": "https://www.dessdental.com/it-it/implant-brands",
+            },
+        ],
+    },
+    {
+        "key": "niba",
+        "name": "Niba",
+        "script": "niba_local_scraper.py",
+        "note": "HOME (/2-home, catalogo completo ~752)",
+        "catalog_url": "https://nibafd.com/2-home",
+        "routes": [
+            {
+                "key": "home",
+                "label": "HOME",
+                "url": "https://nibafd.com/2-home",
             },
         ],
     },
@@ -464,7 +504,7 @@ def collect_frecciarossa_plan() -> list[tuple[dict[str, Any], dict[str, Any]]]:
             planned.append((scraper, config))
             continue
 
-        if key in ("dontalia", "abutment_compatibili"):
+        if key in ("dontalia", "abutment_compatibili", "dess", "niba"):
             routes_meta = scraper["routes"] or []
             routes = []
             for route in routes_meta:
@@ -555,7 +595,7 @@ def print_frecciarossa_summary(planned: list[PlannedJob]) -> None:
                 )
             print(f"  • {name}: rotte [{routes}]; {detail}")
             session_ids.add(config["session_id"])
-        elif scraper["key"] in ("dontalia", "abutment_compatibili"):
+        elif scraper["key"] in ("dontalia", "abutment_compatibili", "dess", "niba"):
             routes = ", ".join(config["routes"])
             print(
                 f"  • {name}: rotte [{routes}]; "
