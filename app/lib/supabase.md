@@ -285,6 +285,7 @@ CREATE TABLE public.product_combinations (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   slug text UNIQUE,
   other jsonb,
+  is_active boolean,
   CONSTRAINT product_combinations_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.link_combinations_scraped_products (

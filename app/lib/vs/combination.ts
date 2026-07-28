@@ -28,9 +28,11 @@ export type VsSide = {
   ecommerce: VsShop;
   shipping_cost: number | null;
   total_price: number | null;
-  /** 1 = più conveniente, 2 = secondo, null = pari / n/d */
-  rank: 1 | 2 | null;
+  /** 1 = più conveniente, poi 2…; null = n/d */
+  rank: number | null;
 };
+
+export type VsCombinationKind = "cluster" | "pair";
 
 export type VsCombination = {
   id: string;
@@ -39,9 +41,11 @@ export type VsCombination = {
   canonical_name: string;
   score: number;
   created_at: string | null;
-  side_a: VsSide;
-  side_b: VsSide;
-  /** Differenza assoluta tra i due prezzi prodotto (null se non calcolabile). */
+  kind: VsCombinationKind;
+  /** Su pagine pair: slug del cluster (canonical SEO). */
+  cluster_slug: string | null;
+  sides: VsSide[];
+  /** Differenza max−min tra prezzi disponibili (null se <2 prezzi). */
   price_diff: number | null;
   /** Shop col prezzo prodotto più basso (null se pari / n/d). */
   cheaper_shop_name: string | null;
@@ -63,9 +67,14 @@ type OtherProduct = {
 };
 
 type CombinationOther = {
+  kind?: unknown;
   score?: unknown;
   title?: unknown;
   canonical_name?: unknown;
+  cluster_slug?: unknown;
+  /** Target 301 da vecchie 1v1 (o combo inactive) verso cluster attivo. */
+  redirect_to?: unknown;
+  products?: unknown;
   product_a?: OtherProduct;
   product_b?: OtherProduct;
 };
@@ -114,6 +123,27 @@ function fallbackShop(fromOther: OtherProduct | undefined): VsShop {
     domain: null,
     shipping_tiers: [],
   };
+}
+
+function parseOtherProducts(other: CombinationOther): OtherProduct[] {
+  if (Array.isArray(other.products)) {
+    return other.products.filter(
+      (p): p is OtherProduct => Boolean(p) && typeof p === "object"
+    );
+  }
+  const legacy = [other.product_a, other.product_b].filter(
+    (p): p is OtherProduct => Boolean(p) && typeof p === "object"
+  );
+  return legacy;
+}
+
+function parseKind(
+  other: CombinationOther,
+  productCount: number
+): VsCombinationKind {
+  const raw = asString(other.kind);
+  if (raw === "cluster" || raw === "pair") return raw;
+  return productCount > 2 ? "cluster" : "pair";
 }
 
 function buildSide(args: {
@@ -169,44 +199,46 @@ function buildSide(args: {
   };
 }
 
-function assignRanks(
-  a: Omit<VsSide, "rank">,
-  b: Omit<VsSide, "rank">
-): { side_a: VsSide; side_b: VsSide; price_diff: number | null; cheaper_shop_name: string | null } {
-  const pa = a.is_escluded ? null : a.final_price;
-  const pb = b.is_escluded ? null : b.final_price;
+function assignRanks(sidesIn: Omit<VsSide, "rank">[]): {
+  sides: VsSide[];
+  price_diff: number | null;
+  cheaper_shop_name: string | null;
+} {
+  const priced = sidesIn
+    .map((side, index) => ({ side, index }))
+    .filter(
+      ({ side }) =>
+        !side.is_escluded && side.final_price != null && !Number.isNaN(side.final_price)
+    )
+    .sort((a, b) => (a.side.final_price as number) - (b.side.final_price as number));
 
-  if (pa == null || pb == null) {
+  const rankByIndex = new Map<number, number>();
+  priced.forEach((entry, i) => {
+    rankByIndex.set(entry.index, i + 1);
+  });
+
+  const sides: VsSide[] = sidesIn.map((side, index) => ({
+    ...side,
+    rank: rankByIndex.get(index) ?? null,
+  }));
+
+  if (priced.length < 2) {
     return {
-      side_a: { ...a, rank: null },
-      side_b: { ...b, rank: null },
+      sides,
       price_diff: null,
-      cheaper_shop_name: null,
+      cheaper_shop_name: priced[0]?.side.ecommerce.name ?? null,
     };
   }
 
-  const diff = Math.abs(pa - pb);
-  if (pa < pb) {
-    return {
-      side_a: { ...a, rank: 1 },
-      side_b: { ...b, rank: 2 },
-      price_diff: diff,
-      cheaper_shop_name: a.ecommerce.name,
-    };
-  }
-  if (pb < pa) {
-    return {
-      side_a: { ...a, rank: 2 },
-      side_b: { ...b, rank: 1 },
-      price_diff: diff,
-      cheaper_shop_name: b.ecommerce.name,
-    };
-  }
+  const min = priced[0].side.final_price as number;
+  const max = priced[priced.length - 1].side.final_price as number;
+  const cheaper = priced[0].side.ecommerce.name;
+  const allSame = max - min < 1e-9;
+
   return {
-    side_a: { ...a, rank: null },
-    side_b: { ...b, rank: null },
-    price_diff: 0,
-    cheaper_shop_name: null,
+    sides,
+    price_diff: allSame ? 0 : max - min,
+    cheaper_shop_name: allSame ? null : cheaper,
   };
 }
 
@@ -218,7 +250,7 @@ export const fetchVsCombinationBySlug = cache(
 
     const { data, error } = await supabase
       .from("product_combinations")
-      .select("id, slug, other, created_at")
+      .select("id, slug, other, created_at, is_active")
       .eq("slug", trimmed)
       .maybeSingle();
 
@@ -226,13 +258,66 @@ export const fetchVsCombinationBySlug = cache(
       throw new Error(`Lettura combination: ${error.message}`);
     }
     if (!data?.slug) return null;
+    // Solo true: null (legacy) e false → non pubbliche
+    if (data.is_active !== true) return null;
+
+    return hydrateVsCombination(data);
+  }
+);
+
+/**
+ * Se lo slug non è più attivo ma ha un redirect_to verso un cluster,
+ * restituisce lo slug destinazione (per 301).
+ */
+export const fetchVsRedirectSlug = cache(
+  async (slug: string): Promise<string | null> => {
+    const trimmed = slug.trim();
+    if (!trimmed) return null;
+
+    const { data, error } = await supabase
+      .from("product_combinations")
+      .select("slug, other, is_active")
+      .eq("slug", trimmed)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`Lettura redirect combination: ${error.message}`);
+    }
+    if (!data?.slug) return null;
+    if (data.is_active === true) return null;
 
     const other = (data.other ?? {}) as CombinationOther;
-    const productAId = asString(other.product_a?.id);
-    const productBId = asString(other.product_b?.id);
-    const ids = [productAId, productBId].filter(
-      (id): id is string => Boolean(id)
-    );
+    const target =
+      asString(other.redirect_to) ?? asString(other.cluster_slug);
+    if (!target || target === trimmed) return null;
+
+    const { data: dest, error: destError } = await supabase
+      .from("product_combinations")
+      .select("slug, is_active")
+      .eq("slug", target)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (destError) {
+      throw new Error(`Lettura destinazione redirect: ${destError.message}`);
+    }
+    return dest?.slug ? String(dest.slug) : null;
+  }
+);
+
+async function hydrateVsCombination(data: {
+  id: unknown;
+  slug: unknown;
+  other: unknown;
+  created_at: unknown;
+}): Promise<VsCombination | null> {
+    const other = (data.other ?? {}) as CombinationOther;
+    const otherProducts = parseOtherProducts(other);
+    if (otherProducts.length < 2) return null;
+
+    const ids = otherProducts
+      .map((p) => asString(p.id))
+      .filter((id): id is string => Boolean(id));
 
     type LiveRow = {
       id: string;
@@ -290,23 +375,24 @@ export const fetchVsCombinationBySlug = cache(
       }
     }
 
-    const sideABase = buildSide({
-      fromOther: other.product_a,
-      live: productAId ? liveById.get(productAId) ?? null : null,
-    });
-    const sideBBase = buildSide({
-      fromOther: other.product_b,
-      live: productBId ? liveById.get(productBId) ?? null : null,
+    const bases = otherProducts.map((fromOther) => {
+      const id = asString(fromOther.id);
+      return buildSide({
+        fromOther,
+        live: id ? liveById.get(id) ?? null : null,
+      });
     });
 
-    const ranked = assignRanks(sideABase, sideBBase);
+    const ranked = assignRanks(bases);
+    const kind = parseKind(other, ranked.sides.length);
     const title =
       asString(other.title) ??
       `${asString(other.canonical_name) ?? "Prodotto"} — confronto prezzi`;
     const canonical =
-      asString(other.canonical_name) ??
-      ranked.side_a.product_name;
+      asString(other.canonical_name) ?? ranked.sides[0]?.product_name ?? "Prodotto";
     const score = asNumber(other.score) ?? 0;
+    const clusterSlug =
+      kind === "pair" ? asString(other.cluster_slug) : null;
 
     return {
       id: String(data.id),
@@ -315,19 +401,21 @@ export const fetchVsCombinationBySlug = cache(
       canonical_name: canonical,
       score,
       created_at: data.created_at ? String(data.created_at) : null,
-      side_a: ranked.side_a,
-      side_b: ranked.side_b,
+      kind,
+      cluster_slug: clusterSlug,
+      sides: ranked.sides,
       price_diff: ranked.price_diff,
       cheaper_shop_name: ranked.cheaper_shop_name,
     };
-  }
-);
+}
 
 export async function countVsCombinationsForSitemap(): Promise<number> {
   const { count, error } = await supabase
     .from("product_combinations")
     .select("id", { count: "exact", head: true })
-    .not("slug", "is", null);
+    .eq("is_active", true)
+    .not("slug", "is", null)
+    .filter("other->>kind", "eq", "cluster");
 
   if (error) {
     const detail = [error.message, error.code, error.details, error.hint]
@@ -356,7 +444,9 @@ export async function fetchVsSitemapEntries(
     const { data, error } = await supabase
       .from("product_combinations")
       .select("slug, created_at")
+      .eq("is_active", true)
       .not("slug", "is", null)
+      .filter("other->>kind", "eq", "cluster")
       .order("slug", { ascending: true })
       .range(from, to);
 
@@ -395,7 +485,19 @@ export function formatVsPrice(price: number | null): string | null {
 export function vsCombinationDisplayTitle(combo: VsCombination): string {
   const diff = formatVsPrice(combo.price_diff);
   if (diff && combo.cheaper_shop_name && (combo.price_diff ?? 0) > 0) {
+    if (combo.kind === "cluster" && combo.sides.length > 2) {
+      return `${combo.canonical_name} — da ${formatVsPrice(
+        combo.sides.find((s) => s.rank === 1)?.final_price ?? null
+      )}, risparmi fino a ${diff}`;
+    }
     return `${combo.canonical_name} — risparmi ${diff} su ${combo.cheaper_shop_name}`;
   }
   return combo.title;
+}
+
+export function vsShopNamesLabel(combo: VsCombination): string {
+  const names = combo.sides.map((s) => s.ecommerce.name);
+  if (names.length <= 1) return names[0] ?? "E-commerce";
+  if (names.length === 2) return `${names[0]} vs ${names[1]}`;
+  return `${names.length} shop a confronto`;
 }

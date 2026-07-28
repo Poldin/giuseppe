@@ -1,6 +1,7 @@
 import {
   formatVsPrice,
   vsCombinationDisplayTitle,
+  vsShopNamesLabel,
   type VsCombination,
   type VsSide,
 } from "@/app/lib/vs/combination";
@@ -28,17 +29,28 @@ export function getVsCombinationDateModified(
   return date.toISOString();
 }
 
+/** Canonical pubblico: le pair puntano al cluster quando disponibile. */
+export function getVsCombinationCanonicalPath(combo: VsCombination): string {
+  if (combo.kind === "pair" && combo.cluster_slug) {
+    return vsCombinationPath(combo.cluster_slug);
+  }
+  return vsCombinationPath(combo.slug);
+}
+
 export function getVsCombinationMetaDescription(combo: VsCombination): string {
-  const a = combo.side_a.ecommerce.name;
-  const b = combo.side_b.ecommerce.name;
   const name = combo.canonical_name;
+  const shops = vsShopNamesLabel(combo);
   const diff = formatVsPrice(combo.price_diff);
+  const n = combo.sides.length;
 
   if (diff && combo.cheaper_shop_name && (combo.price_diff ?? 0) > 0) {
-    return `Confronto prezzi ${name}: ${a} vs ${b}. Su ${combo.cheaper_shop_name} risparmi ${diff}. Confronta offerte per studi dentistici con ${SITE_NAME}. Il prezzo finale e l’IVA vanno verificati sul sito del rivenditore.`;
+    if (n > 2) {
+      return `Confronto prezzi ${name} su ${n} shop (${shops}). Su ${combo.cheaper_shop_name} risparmi fino a ${diff}. Confronta offerte per studi dentistici con ${SITE_NAME}. Il prezzo finale e l’IVA vanno verificati sul sito del rivenditore.`;
+    }
+    return `Confronto prezzi ${name}: ${shops}. Su ${combo.cheaper_shop_name} risparmi ${diff}. Confronta offerte per studi dentistici con ${SITE_NAME}. Il prezzo finale e l’IVA vanno verificati sul sito del rivenditore.`;
   }
 
-  return `Confronto prezzi ${name}: ${a} vs ${b}. Confronta offerte per studi dentistici con ${SITE_NAME}. Il prezzo finale e l’IVA vanno verificati sul sito del rivenditore.`;
+  return `Confronto prezzi ${name}: ${shops}. Confronta offerte per studi dentistici con ${SITE_NAME}. Il prezzo finale e l’IVA vanno verificati sul sito del rivenditore.`;
 }
 
 function sidePriceLabel(side: VsSide): string {
@@ -56,14 +68,20 @@ export function getVsCombinationFaqItems(
   now = new Date()
 ): FaqItem[] {
   const name = combo.canonical_name;
-  const a = combo.side_a;
-  const b = combo.side_b;
   const diff = formatVsPrice(combo.price_diff);
+  const priced = combo.sides.filter(
+    (s) => !s.is_escluded && s.final_price != null
+  );
 
   const cheaperAnswer =
     diff && combo.cheaper_shop_name && (combo.price_diff ?? 0) > 0
-      ? `Secondo il catalogo di ${SITE_NAME}, ${name} conviene di più su ${combo.cheaper_shop_name}: differenza di ${diff} rispetto all’altra offerta (${sidePriceLabel(a)}; ${sidePriceLabel(b)}). I prezzi sono di catalogo; verifica sempre sul sito del rivenditore.`
-      : `Per ${name} confrontiamo ${a.ecommerce.name} e ${b.ecommerce.name}: ${sidePriceLabel(a)}; ${sidePriceLabel(b)}. Verifica sempre prezzo e disponibilità sul sito del rivenditore.`;
+      ? `Secondo il catalogo di ${SITE_NAME}, ${name} conviene di più su ${combo.cheaper_shop_name}: differenza fino a ${diff} rispetto alle altre offerte (${priced.map(sidePriceLabel).join("; ")}). I prezzi sono di catalogo; verifica sempre sul sito del rivenditore.`
+      : `Per ${name} confrontiamo ${vsShopNamesLabel(combo)}: ${combo.sides.map(sidePriceLabel).join("; ")}. Verifica sempre prezzo e disponibilità sul sito del rivenditore.`;
+
+  const pricesQuestion =
+    combo.sides.length > 2
+      ? `Quali sono i prezzi di ${name} sui diversi shop?`
+      : `Qual è il prezzo di ${name} su ${combo.sides[0]?.ecommerce.name ?? "shop A"} e ${combo.sides[1]?.ecommerce.name ?? "shop B"}?`;
 
   return [
     {
@@ -71,8 +89,8 @@ export function getVsCombinationFaqItems(
       answer: cheaperAnswer,
     },
     {
-      question: `Qual è il prezzo di ${name} su ${a.ecommerce.name} e ${b.ecommerce.name}?`,
-      answer: `${sidePriceLabel(a)}. ${sidePriceLabel(b)}. ${SITE_NAME} confronta i cataloghi ma non vende i prodotti.`,
+      question: pricesQuestion,
+      answer: `${combo.sides.map(sidePriceLabel).join(". ")}. ${SITE_NAME} confronta i cataloghi ma non vende i prodotti.`,
     },
     {
       question: "I prezzi sono aggiornati? Includono l’IVA?",
@@ -110,11 +128,15 @@ function offerForSide(side: VsSide, pageUrl: string) {
 
 export function getVsCombinationJsonLd(combo: VsCombination, now = new Date()) {
   const url = vsCombinationAbsoluteUrl(combo.slug);
+  const canonicalUrl =
+    combo.kind === "pair" && combo.cluster_slug
+      ? vsCombinationAbsoluteUrl(combo.cluster_slug)
+      : url;
   const faqItems = getVsCombinationFaqItems(combo, now);
   const dateModified = getVsCombinationDateModified(combo);
-  const offers = [offerForSide(combo.side_a, url), offerForSide(combo.side_b, url)].filter(
-    Boolean
-  );
+  const offers = combo.sides
+    .map((side) => offerForSide(side, url))
+    .filter(Boolean);
 
   return {
     "@context": "https://schema.org",
@@ -128,6 +150,7 @@ export function getVsCombinationJsonLd(combo: VsCombination, now = new Date()) {
         inLanguage: "it-IT",
         isPartOf: { "@id": `${SITE_URL}/#website` },
         about: { "@id": `${url}#product` },
+        ...(canonicalUrl !== url ? { mainEntityOfPage: canonicalUrl } : {}),
         ...(dateModified ? { dateModified } : {}),
       },
       {
@@ -141,22 +164,14 @@ export function getVsCombinationJsonLd(combo: VsCombination, now = new Date()) {
       {
         "@type": "ItemList",
         "@id": `${url}#offers`,
-        name: `Confronto ${combo.side_a.ecommerce.name} vs ${combo.side_b.ecommerce.name}`,
-        numberOfItems: 2,
-        itemListElement: [
-          {
-            "@type": "ListItem",
-            position: 1,
-            name: `${combo.side_a.product_name} su ${combo.side_a.ecommerce.name}`,
-            url: combo.side_a.original_url ?? url,
-          },
-          {
-            "@type": "ListItem",
-            position: 2,
-            name: `${combo.side_b.product_name} su ${combo.side_b.ecommerce.name}`,
-            url: combo.side_b.original_url ?? url,
-          },
-        ],
+        name: `Confronto ${vsShopNamesLabel(combo)}`,
+        numberOfItems: combo.sides.length,
+        itemListElement: combo.sides.map((side, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          name: `${side.product_name} su ${side.ecommerce.name}`,
+          url: side.original_url ?? url,
+        })),
       },
       {
         "@type": "BreadcrumbList",
@@ -172,7 +187,7 @@ export function getVsCombinationJsonLd(combo: VsCombination, now = new Date()) {
             "@type": "ListItem",
             position: 2,
             name: combo.canonical_name,
-            item: url,
+            item: canonicalUrl,
           },
         ],
       },

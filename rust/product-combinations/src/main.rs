@@ -1,7 +1,10 @@
 //! Match trigram locale (stile pg_trgm) tra scraped_product di shop diversi.
-//! Output: coppie con similarity >= soglia.
-//! Slug: {canonical}-{shopA}-vs-{shopB}
-//! other.title pronto per SEO + score + meta prodotti.
+//!
+//! Output: solo cluster (1 vs many).
+//! Slug: {canonical}
+//! other.kind = "cluster", other.products = […un prodotto per shop…]
+//!
+//! Soglia default 0.70. Shop dedupe: max 1 prodotto per ecommerce nel cluster.
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -40,20 +43,20 @@ struct ShopRow {
 struct CombinationOut {
     slug: String,
     other: CombinationOther,
-    product_a_id: String,
-    product_b_id: String,
+    /// Id prodotti collegati (ordine = other.products).
+    product_ids: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
 struct CombinationOther {
+    kind: &'static str,
     score: f64,
     title: String,
     canonical_name: String,
-    product_a: ProductMeta,
-    product_b: ProductMeta,
+    products: Vec<ProductMeta>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 struct ProductMeta {
     id: String,
     product_name: String,
@@ -74,6 +77,51 @@ struct IndexedProduct {
     pub_slug: Option<String>,
     norm: String,
     trigrams: HashSet<u32>,
+}
+
+#[derive(Clone, Copy)]
+struct Edge {
+    i: usize,
+    j: usize,
+    score: f64,
+}
+
+struct UnionFind {
+    parent: Vec<usize>,
+    rank: Vec<u8>,
+}
+
+impl UnionFind {
+    fn new(n: usize) -> Self {
+        Self {
+            parent: (0..n).collect(),
+            rank: vec![0; n],
+        }
+    }
+
+    fn find(&mut self, x: usize) -> usize {
+        let mut x = x;
+        while self.parent[x] != x {
+            self.parent[x] = self.parent[self.parent[x]];
+            x = self.parent[x];
+        }
+        x
+    }
+
+    fn union(&mut self, a: usize, b: usize) {
+        let mut ra = self.find(a);
+        let mut rb = self.find(b);
+        if ra == rb {
+            return;
+        }
+        if self.rank[ra] < self.rank[rb] {
+            std::mem::swap(&mut ra, &mut rb);
+        }
+        self.parent[rb] = ra;
+        if self.rank[ra] == self.rank[rb] {
+            self.rank[ra] += 1;
+        }
+    }
 }
 
 fn pack_trigram(chars: &[char; 3]) -> u32 {
@@ -132,7 +180,6 @@ fn slugify(text: &str) -> String {
     if s.is_empty() {
         "prodotto".to_string()
     } else {
-        // lascia spazio per -shopA-vs-shopB (~40 char)
         s.chars().take(100).collect()
     }
 }
@@ -142,7 +189,6 @@ fn display_name(name: &str) -> String {
     if t.is_empty() {
         return "Prodotto".to_string();
     }
-    // Title-ish: se tutto maiuscolo, normalizza a sentence case leggibile
     let letters: Vec<char> = t.chars().filter(|c| c.is_alphabetic()).collect();
     let all_upper = !letters.is_empty() && letters.iter().all(|c| c.is_uppercase());
     if all_upper {
@@ -157,49 +203,27 @@ fn display_name(name: &str) -> String {
     }
 }
 
-fn pick_canonical(a: &IndexedProduct, b: &IndexedProduct) -> String {
-    let da = display_name(&a.product_name);
-    let db = display_name(&b.product_name);
-    if da.chars().count() > db.chars().count() {
-        da
-    } else if db.chars().count() > da.chars().count() {
-        db
-    } else if a.norm <= b.norm {
-        da
-    } else {
-        db
+fn pick_canonical(products: &[&IndexedProduct]) -> String {
+    let mut best: Option<&IndexedProduct> = None;
+    for p in products {
+        best = Some(match best {
+            None => p,
+            Some(cur) => {
+                let da = display_name(&p.product_name);
+                let db = display_name(&cur.product_name);
+                if da.chars().count() > db.chars().count() {
+                    p
+                } else if db.chars().count() > da.chars().count() {
+                    cur
+                } else if p.norm <= cur.norm {
+                    p
+                } else {
+                    cur
+                }
+            }
+        });
     }
-}
-
-fn names_effectively_same(a: &IndexedProduct, b: &IndexedProduct, score: f64) -> bool {
-    a.norm == b.norm || score >= 0.90
-}
-
-fn make_slug_and_title(left: &IndexedProduct, right: &IndexedProduct, score: f64) -> (String, String, String) {
-    let canonical = pick_canonical(left, right);
-    let shop_l = left.ecommerce_name.as_str();
-    let shop_r = right.ecommerce_name.as_str();
-
-    let slug = format!(
-        "{}-{}-vs-{}",
-        slugify(&canonical),
-        slugify(shop_l),
-        slugify(shop_r)
-    );
-
-    let title = if names_effectively_same(left, right, score) {
-        format!("{} — {} vs {}", canonical, shop_l, shop_r)
-    } else {
-        format!(
-            "{} vs {} — {} vs {}",
-            display_name(&left.product_name),
-            display_name(&right.product_name),
-            shop_l,
-            shop_r
-        )
-    };
-
-    (slug, title, canonical)
+    display_name(&best.map(|p| p.product_name.as_str()).unwrap_or("Prodotto"))
 }
 
 fn meta_of(p: &IndexedProduct) -> ProductMeta {
@@ -212,6 +236,20 @@ fn meta_of(p: &IndexedProduct) -> ProductMeta {
         final_price: p.final_price,
         pub_slug: p.pub_slug.clone(),
     }
+}
+
+fn make_cluster_slug_title(members: &[&IndexedProduct], score: f64) -> (String, String, String) {
+    let canonical = pick_canonical(members);
+    let slug = slugify(&canonical);
+    let n = members.len();
+    let title = if n <= 2 {
+        let shops: Vec<&str> = members.iter().map(|p| p.ecommerce_name.as_str()).collect();
+        format!("{} — {} vs {}", canonical, shops[0], shops.get(1).copied().unwrap_or("shop"))
+    } else {
+        format!("{} — confronto prezzi su {} shop", canonical, n)
+    };
+    let _ = score;
+    (slug, title, canonical)
 }
 
 fn load_shops(path: &Path) -> HashMap<String, String> {
@@ -267,28 +305,7 @@ fn build_index(products: Vec<Product>, shops: &HashMap<String, String>) -> Vec<I
         .collect()
 }
 
-fn order_pair<'a>(
-    a: &'a IndexedProduct,
-    b: &'a IndexedProduct,
-) -> (&'a IndexedProduct, &'a IndexedProduct) {
-    let ka = (
-        normalize_name(&a.ecommerce_name),
-        a.ecommerce_id.as_str(),
-        a.id.as_str(),
-    );
-    let kb = (
-        normalize_name(&b.ecommerce_name),
-        b.ecommerce_id.as_str(),
-        b.id.as_str(),
-    );
-    if ka <= kb {
-        (a, b)
-    } else {
-        (b, a)
-    }
-}
-
-fn find_pairs(products: &[IndexedProduct], threshold: f64) -> Vec<CombinationOut> {
+fn find_edges(products: &[IndexedProduct], threshold: f64) -> Vec<Edge> {
     eprintln!("Building inverted index…");
     let mut inverted: HashMap<u32, Vec<usize>> = HashMap::new();
     for (i, p) in products.iter().enumerate() {
@@ -312,7 +329,7 @@ fn find_pairs(products: &[IndexedProduct], threshold: f64) -> Vec<CombinationOut
 
     use rayon::prelude::*;
 
-    let pairs: Vec<CombinationOut> = (0..products.len())
+    let edges: Vec<Edge> = (0..products.len())
         .into_par_iter()
         .flat_map_iter(|i| {
             let a = &products[i];
@@ -346,22 +363,11 @@ fn find_pairs(products: &[IndexedProduct], threshold: f64) -> Vec<CombinationOut
                 if score + f64::EPSILON < threshold {
                     continue;
                 }
-
-                let (left, right) = order_pair(a, b);
                 let score_r = (score * 10_000.0).round() / 10_000.0;
-                let (slug, title, canonical) = make_slug_and_title(left, right, score_r);
-
-                local.push(CombinationOut {
-                    slug,
-                    other: CombinationOther {
-                        score: score_r,
-                        title,
-                        canonical_name: canonical,
-                        product_a: meta_of(left),
-                        product_b: meta_of(right),
-                    },
-                    product_a_id: left.id.clone(),
-                    product_b_id: right.id.clone(),
+                local.push(Edge {
+                    i,
+                    j,
+                    score: score_r,
                 });
             }
             local
@@ -369,16 +375,157 @@ fn find_pairs(products: &[IndexedProduct], threshold: f64) -> Vec<CombinationOut
         .collect();
 
     eprintln!(
-        "Done in {:.1}s | candidates≈{} | pairs≥{threshold}={}",
+        "Done in {:.1}s | candidates≈{} | edges≥{threshold}={}",
         start.elapsed().as_secs_f64(),
         candidates_checked.load(Ordering::Relaxed),
-        pairs.len()
+        edges.len()
     );
-    pairs
+    edges
 }
 
-fn dedupe_slugs(mut pairs: Vec<CombinationOut>) -> Vec<CombinationOut> {
-    pairs.sort_by(|a, b| {
+fn edge_key(a: usize, b: usize) -> (usize, usize) {
+    if a < b {
+        (a, b)
+    } else {
+        (b, a)
+    }
+}
+
+fn avg_edge_score(idx: usize, others: &[usize], edge_score: &HashMap<(usize, usize), f64>) -> f64 {
+    let mut sum = 0.0;
+    let mut n = 0usize;
+    for &o in others {
+        if o == idx {
+            continue;
+        }
+        if let Some(&s) = edge_score.get(&edge_key(idx, o)) {
+            sum += s;
+            n += 1;
+        }
+    }
+    if n == 0 {
+        0.0
+    } else {
+        sum / n as f64
+    }
+}
+
+fn build_combinations(products: &[IndexedProduct], edges: &[Edge]) -> Vec<CombinationOut> {
+    let mut uf = UnionFind::new(products.len());
+    let mut edge_score: HashMap<(usize, usize), f64> = HashMap::with_capacity(edges.len());
+    for e in edges {
+        uf.union(e.i, e.j);
+        edge_score.insert(edge_key(e.i, e.j), e.score);
+    }
+
+    let mut components: HashMap<usize, Vec<usize>> = HashMap::new();
+    let mut touched = HashSet::new();
+    for e in edges {
+        touched.insert(e.i);
+        touched.insert(e.j);
+    }
+    for idx in touched {
+        let root = uf.find(idx);
+        components.entry(root).or_default().push(idx);
+    }
+
+    let mut out = Vec::new();
+    let mut used_slugs: HashSet<String> = HashSet::new();
+
+    let mut roots: Vec<usize> = components.keys().copied().collect();
+    roots.sort_unstable();
+
+    for root in roots {
+        let members = components.get(&root).cloned().unwrap_or_default();
+        if members.len() < 2 {
+            continue;
+        }
+
+        // Group by shop → keep best avg edge score within component.
+        let mut by_shop: HashMap<&str, Vec<usize>> = HashMap::new();
+        for &idx in &members {
+            by_shop
+                .entry(products[idx].ecommerce_id.as_str())
+                .or_default()
+                .push(idx);
+        }
+
+        let mut selected: Vec<usize> = Vec::new();
+        for (_shop, idxs) in by_shop {
+            if idxs.len() == 1 {
+                selected.push(idxs[0]);
+                continue;
+            }
+            let best = idxs
+                .iter()
+                .copied()
+                .max_by(|a, b| {
+                    let sa = avg_edge_score(*a, &members, &edge_score);
+                    let sb = avg_edge_score(*b, &members, &edge_score);
+                    sa.partial_cmp(&sb)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| products[*a].id.cmp(&products[*b].id))
+                })
+                .unwrap();
+            selected.push(best);
+        }
+
+        if selected.len() < 2 {
+            continue;
+        }
+
+        // Stable order: shop name, then id.
+        selected.sort_by(|&a, &b| {
+            normalize_name(&products[a].ecommerce_name)
+                .cmp(&normalize_name(&products[b].ecommerce_name))
+                .then_with(|| products[a].ecommerce_id.cmp(&products[b].ecommerce_id))
+                .then_with(|| products[a].id.cmp(&products[b].id))
+        });
+
+        let selected_set: HashSet<usize> = selected.iter().copied().collect();
+        let mut internal_scores: Vec<f64> = Vec::new();
+        for e in edges {
+            if selected_set.contains(&e.i) && selected_set.contains(&e.j) {
+                internal_scores.push(e.score);
+            }
+        }
+        if internal_scores.is_empty() {
+            continue;
+        }
+        let cluster_score = internal_scores.iter().copied().fold(0.0_f64, f64::max);
+        let cluster_score = (cluster_score * 10_000.0).round() / 10_000.0;
+
+        let member_refs: Vec<&IndexedProduct> = selected.iter().map(|&i| &products[i]).collect();
+        let (mut cluster_slug, cluster_title, canonical) =
+            make_cluster_slug_title(&member_refs, cluster_score);
+
+        if used_slugs.contains(&cluster_slug) {
+            let short: String = selected
+                .iter()
+                .map(|&i| products[i].id.chars().take(4).collect::<String>())
+                .collect::<Vec<_>>()
+                .join("");
+            cluster_slug = format!("{cluster_slug}-{short}");
+        }
+        used_slugs.insert(cluster_slug.clone());
+
+        let cluster_products: Vec<ProductMeta> = member_refs.iter().map(|p| meta_of(p)).collect();
+        let cluster_ids: Vec<String> = selected.iter().map(|&i| products[i].id.clone()).collect();
+
+        out.push(CombinationOut {
+            slug: cluster_slug,
+            other: CombinationOther {
+                kind: "cluster",
+                score: cluster_score,
+                title: cluster_title,
+                canonical_name: canonical,
+                products: cluster_products,
+            },
+            product_ids: cluster_ids,
+        });
+    }
+
+    out.sort_by(|a, b| {
         b.other
             .score
             .partial_cmp(&a.other.score)
@@ -386,18 +533,6 @@ fn dedupe_slugs(mut pairs: Vec<CombinationOut>) -> Vec<CombinationOut> {
             .then_with(|| a.slug.cmp(&b.slug))
     });
 
-    let mut used_slugs = HashSet::new();
-    let mut out = Vec::with_capacity(pairs.len());
-    for mut p in pairs {
-        let base = p.slug.clone();
-        if used_slugs.contains(&base) {
-            let short_a: String = p.other.product_a.id.chars().take(8).collect();
-            let short_b: String = p.other.product_b.id.chars().take(8).collect();
-            p.slug = format!("{base}-{short_a}-{short_b}");
-        }
-        used_slugs.insert(p.slug.clone());
-        out.push(p);
-    }
     out
 }
 
@@ -463,15 +598,19 @@ fn main() {
     };
     eprintln!("Shops: {by_shop:?}");
 
-    let pairs = find_pairs(&indexed, threshold);
-    let pairs = dedupe_slugs(pairs);
-    eprintln!("Writing {} combinations…", pairs.len());
-    write_jsonl(output, &pairs);
+    let edges = find_edges(&indexed, threshold);
+    let combos = build_combinations(&indexed, &edges);
 
-    if let Some(sample) = pairs.first() {
+    eprintln!("Writing {} cluster combinations…", combos.len());
+    write_jsonl(output, &combos);
+
+    if let Some(sample) = combos.first() {
         eprintln!(
-            "Sample: slug={}\ntitle={}\nscore={}",
-            sample.slug, sample.other.title, sample.other.score
+            "Sample cluster: slug={}\ntitle={}\nproducts={}\nscore={}",
+            sample.slug,
+            sample.other.title,
+            sample.other.products.len(),
+            sample.other.score
         );
     }
 }

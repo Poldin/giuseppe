@@ -4,6 +4,7 @@ import { PubProductFaq } from "@/app/components/pub/PubProductFaq";
 import { VsLiveRefresh } from "@/app/components/vs/VsLiveRefresh";
 import {
   formatVsPrice,
+  vsShopNamesLabel,
   type VsCombination,
   type VsSide,
 } from "@/app/lib/vs/combination";
@@ -23,6 +24,7 @@ function ecommerceHref(domain: string | null): string | null {
 function medalFor(rank: VsSide["rank"]): string | null {
   if (rank === 1) return "🥇";
   if (rank === 2) return "🥈";
+  if (rank === 3) return "🥉";
   return null;
 }
 
@@ -68,6 +70,14 @@ function SideCard({ side }: { side: VsSide }) {
   const shippingLabel = formatVsPrice(side.shipping_cost);
   const totalLabel = formatVsPrice(side.total_price);
   const productUrl = side.original_url?.trim() || null;
+  const rankLabel =
+    side.rank === 1
+      ? "Primo prezzo"
+      : side.rank === 2
+        ? "Secondo prezzo"
+        : side.rank === 3
+          ? "Terzo prezzo"
+          : null;
 
   return (
     <article
@@ -80,7 +90,7 @@ function SideCard({ side }: { side: VsSide }) {
       <div className="flex items-start justify-between gap-3">
         <ShopBadge side={side} />
         {medal ? (
-          <span className="text-2xl leading-none" aria-label={side.rank === 1 ? "Primo prezzo" : "Secondo prezzo"}>
+          <span className="text-2xl leading-none" aria-label={rankLabel ?? undefined}>
             {medal}
           </span>
         ) : null}
@@ -150,6 +160,12 @@ export function VsComparisonView({
   const [combo, setCombo] = useState(combination);
   const faqItems = getVsCombinationFaqItems(combo);
   const diffLabel = formatVsPrice(combo.price_diff);
+  const sortedSides = [...combo.sides].sort((a, b) => {
+    const ra = a.rank ?? 999;
+    const rb = b.rank ?? 999;
+    if (ra !== rb) return ra - rb;
+    return a.ecommerce.name.localeCompare(b.ecommerce.name, "it");
+  });
 
   const onUpdate = useCallback((next: VsCombination) => {
     setCombo(next);
@@ -180,9 +196,7 @@ export function VsComparisonView({
           <h1 className="text-2xl font-black uppercase leading-tight tracking-tighter sm:text-3xl">
             {combo.canonical_name}
           </h1>
-          <p className="text-sm text-zinc-500">
-            {combo.side_a.ecommerce.name} vs {combo.side_b.ecommerce.name}
-          </p>
+          <p className="text-sm text-zinc-500">{vsShopNamesLabel(combo)}</p>
         </header>
 
         <section
@@ -192,18 +206,18 @@ export function VsComparisonView({
           {diffLabel && combo.cheaper_shop_name && (combo.price_diff ?? 0) > 0 ? (
             <>
               <p className="text-xs font-bold uppercase tracking-wide text-zinc-500">
-                Differenza
+                {combo.sides.length > 2 ? "Risparmio fino a" : "Differenza"}
               </p>
               <p className="mt-1 text-3xl font-black tracking-tighter tabular-nums text-emerald-700 dark:text-emerald-400">
                 {diffLabel}
               </p>
               <p className="mt-1 text-sm font-medium text-zinc-600 dark:text-zinc-300">
-                risparmi su {combo.cheaper_shop_name}
+                conviene di più su {combo.cheaper_shop_name}
               </p>
             </>
           ) : diffLabel && combo.price_diff === 0 ? (
             <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
-              Stesso prezzo catalogo su entrambi gli shop
+              Stesso prezzo catalogo sugli shop a confronto
             </p>
           ) : (
             <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
@@ -217,8 +231,9 @@ export function VsComparisonView({
           className="mt-8 grid grid-cols-1 gap-4"
           aria-label="Offerte a confronto"
         >
-          <SideCard side={combo.side_a} />
-          <SideCard side={combo.side_b} />
+          {sortedSides.map((side) => (
+            <SideCard key={side.id || `${side.ecommerce.id}-${side.product_name}`} side={side} />
+          ))}
         </section>
 
         <PubProductFaq items={faqItems} />
