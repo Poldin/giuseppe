@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from scrape_cli import prompt_yes_no, require_interactive_tty
-from scrape_pages import page_plan_to_dict, prompt_page_plan, prompt_total_pages
+from scrape_pages import page_plan_to_dict, prompt_page_plan
 from scrape_session import default_session_id
 
 SCRAPING_DIR = Path(__file__).resolve().parent
@@ -428,16 +428,7 @@ def collect_frecciarossa_plan() -> list[tuple[dict[str, Any], dict[str, Any]]]:
                 "session_id": session_id,
                 "routes": routes,
                 "page_plan": page_plan_to_dict(page_plan),
-                "total_pages_by_route": {},
             }
-            if page_plan.mode == "range":
-                url_by_key = {route["key"]: route["url"] for route in routes_meta}
-                for route_key in routes:
-                    print()
-                    print(f"=== Totale pagine {name} {route_key.upper()} ===")
-                    config["total_pages_by_route"][route_key] = prompt_total_pages(
-                        url_by_key[route_key]
-                    )
             planned.append((scraper, config))
             continue
 
@@ -526,11 +517,7 @@ def print_frecciarossa_summary(planned: list[PlannedJob]) -> None:
             if plan["mode"] == "list":
                 detail = f"pagine {plan['pages']}"
             else:
-                totals = ", ".join(
-                    f"{key}={config['total_pages_by_route'][key]}"
-                    for key in config["routes"]
-                )
-                detail = f"da {plan['start_page']}, totali [{totals}]"
+                detail = f"da {plan['start_page']} (fino a pagina vuota)"
             print(f"  • {name}: rotte [{routes}]; {detail}")
             session_ids.add(config["session_id"])
         elif scraper["key"] == "dontalia":

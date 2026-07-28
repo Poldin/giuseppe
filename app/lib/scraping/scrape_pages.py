@@ -46,8 +46,8 @@ def _looks_like_page_list(raw: str) -> bool:
 def prompt_page_plan() -> PagePlan:
     print()
     print("Quali pagine vuoi scrapare?")
-    print('  Invio / "y" → dalla pagina 1 fino alla fine (ti chiederò il totale)')
-    print("  Numero N    → dalla pagina N fino alla fine")
+    print('  Invio / "y" → dalla pagina 1, continua finché trova dati')
+    print("  Numero N    → dalla pagina N, continua finché trova dati")
     print("  [2,4,8]     → solo le pagine indicate (anche [2] per una sola pagina)")
 
     while True:
@@ -75,21 +75,12 @@ def prompt_page_plan() -> PagePlan:
         print('Inserisci un numero, una lista tipo [2,4,8], oppure Invio per partire da 1.')
 
 
-def prompt_total_pages(catalog_hint: str) -> int:
-    print()
-    print(f"Apri {catalog_hint} nel browser e controlla quante pagine ci sono in totale.")
-    while True:
-        raw = input("Quante sono le pagine totali? ").strip()
-        try:
-            total = int(raw)
-            if total >= 1:
-                return total
-            print("Inserisci un numero >= 1.")
-        except ValueError:
-            print("Numero non valido, riprova.")
-
-
 def resolve_pages(plan: PagePlan, total_pages: int | None = None) -> list[int]:
+    """Risolve le pagine per modalità list, o range con totale esplicito.
+
+    In modalità range senza total_pages lo scraper deve iterare da solo
+    finché non trova una pagina vuota (non usare questa funzione).
+    """
     if plan.mode == "list":
         return plan.pages
 

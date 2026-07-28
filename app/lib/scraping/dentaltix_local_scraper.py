@@ -18,9 +18,10 @@ from scrape_pages import (
     PagePlan,
     page_plan_from_dict,
     prompt_page_plan,
-    prompt_total_pages,
     resolve_pages,
 )
+
+MAX_PAGES_PER_ROUTE = 5000
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 load_dotenv(ROOT_DIR / ".env.local")
@@ -384,7 +385,6 @@ def run_route(
     *,
     session_id: str | None = None,
     page_plan: PagePlan | None = None,
-    total_pages: int | None = None,
 ) -> None:
     route = ROUTES[route_key]
     label = route["label"]
@@ -397,50 +397,70 @@ def run_route(
     if page_plan is None:
         page_plan = prompt_page_plan()
 
-    if page_plan.mode == "range" and total_pages is None:
-        total_pages = prompt_total_pages(base_url)
-
-    try:
-        pages_to_scrape = resolve_pages(page_plan, total_pages)
-    except ValueError as exc:
-        log(f"[{label}] Configurazione pagine non valida: {exc}")
-        sys.exit(1)
-
     if session_id is None:
         session_id = prompt_session_id(supabase, ECOMMERCE_ID, f"Dentaltix {label}")
 
     if page_plan.mode == "list":
+        try:
+            pages_to_scrape = resolve_pages(page_plan)
+        except ValueError as exc:
+            log(f"[{label}] Configurazione pagine non valida: {exc}")
+            sys.exit(1)
         log(f"[{label}] Pagine specifiche: {pages_to_scrape}")
-    else:
-        log(
-            f"[{label}] Pagine {page_plan.start_page} → {total_pages} "
-            f"(totale {len(pages_to_scrape)})"
-        )
+        log(f"[{label}] Session ID: {session_id}")
+
+        for index, page in enumerate(pages_to_scrape, start=1):
+            log(
+                f"[{label}] --- Inizio pagina {page} "
+                f"({index}/{len(pages_to_scrape)}) ---"
+            )
+            html = scrape_page(page, label, base_url)
+            result = parse_and_save(html, page, session_id, label)
+
+            if result is None:
+                log(f"[{label}] Pagina {page}: errore scraping, stop rotta")
+                break
+
+            if index < len(pages_to_scrape):
+                pause = random.uniform(2.5, 5.0)
+                log(f"[{label}] Pagina {page}: pausa {pause:.1f}s prima della prossima")
+                time.sleep(pause)
+
+        log(f"=== Rotta {label} completata ===")
+        return
+
+    print("Le pagine verranno scrapate in automatico finché non se ne trova una vuota.")
+    log(f"[{label}] Partenza da pagina {page_plan.start_page} (fino a pagina vuota)")
     log(f"[{label}] Session ID: {session_id}")
 
-    for index, page in enumerate(pages_to_scrape, start=1):
-        if page > 5000:
-            log(f"[{label}] Limite sicurezza 5000 pagine raggiunto, stop")
-            break
+    page_number = page_plan.start_page
+    pages_scraped = 0
 
-        if page_plan.mode == "list":
-            log(f"[{label}] --- Inizio pagina {page} ({index}/{len(pages_to_scrape)}) ---")
-        else:
-            log(f"[{label}] --- Inizio pagina {page}/{total_pages} ---")
+    while page_number <= MAX_PAGES_PER_ROUTE:
+        log(f"[{label}] --- Inizio pagina {page_number} ---")
 
-        html = scrape_page(page, label, base_url)
-        result = parse_and_save(html, page, session_id, label)
+        html = scrape_page(page_number, label, base_url)
+        result = parse_and_save(html, page_number, session_id, label)
 
         if result == -1:
-            log(f"[{label}] Pagina {page}: nessun prodotto, stop")
+            log(f"[{label}] Pagina {page_number}: nessun prodotto, fine rotta")
             break
 
-        if index < len(pages_to_scrape):
-            pause = random.uniform(2.5, 5.0)
-            log(f"[{label}] Pagina {page}: pausa {pause:.1f}s prima della prossima")
-            time.sleep(pause)
+        if result is None:
+            log(f"[{label}] Pagina {page_number}: errore scraping / fine catalogo, stop")
+            break
 
-    log(f"=== Rotta {label} completata ===")
+        pages_scraped += 1
+        page_number += 1
+
+        pause = random.uniform(2.5, 5.0)
+        log(f"[{label}] Pagina {page_number - 1}: pausa {pause:.1f}s prima della prossima")
+        time.sleep(pause)
+
+    if page_number > MAX_PAGES_PER_ROUTE:
+        log(f"[{label}] Limite sicurezza {MAX_PAGES_PER_ROUTE} pagine raggiunto, stop")
+
+    log(f"=== Rotta {label} completata ({pages_scraped} pagine con dati) ===")
 
 
 def run_from_config(config: dict) -> None:
@@ -453,21 +473,10 @@ def run_from_config(config: dict) -> None:
         raise ValueError("session_id mancante nella config Dentaltix")
 
     page_plan = page_plan_from_dict(config["page_plan"])
-    totals_raw = config.get("total_pages_by_route", {})
-    if not isinstance(totals_raw, dict):
-        raise ValueError("total_pages_by_route deve essere un oggetto")
 
     for index, route_key in enumerate(routes, start=1):
         if route_key not in ROUTES:
             raise ValueError(f"rotta Dentaltix sconosciuta: {route_key!r}")
-
-        total_pages: int | None = None
-        if page_plan.mode == "range":
-            if route_key not in totals_raw:
-                raise ValueError(
-                    f"total_pages_by_route.{route_key} obbligatorio in modalità range"
-                )
-            total_pages = int(totals_raw[route_key])
 
         if index > 1:
             print()
@@ -477,7 +486,6 @@ def run_from_config(config: dict) -> None:
             route_key,
             session_id=session_id,
             page_plan=page_plan,
-            total_pages=total_pages,
         )
 
     log("=== Scraping Dentaltix completato ===")
@@ -520,13 +528,6 @@ def main(argv: list[str] | None = None) -> None:
         )
         session_id = prompt_session_id(supabase, ECOMMERCE_ID, "Dentaltix")
         page_plan = prompt_page_plan()
-        total_pages_by_route: dict[str, int] = {}
-        if page_plan.mode == "range":
-            for route_key in selected_routes:
-                route = ROUTES[route_key]
-                print()
-                print(f"=== Totale pagine rotta {route['label']} ===")
-                total_pages_by_route[route_key] = prompt_total_pages(route["base_url"])
     else:
         print()
         print("Quali rotte Dentaltix vuoi eseguire?")
@@ -541,7 +542,6 @@ def main(argv: list[str] | None = None) -> None:
 
         session_id = None
         page_plan = None
-        total_pages_by_route = {}
 
     for index, route_key in enumerate(selected_routes, start=1):
         if index > 1:
@@ -551,7 +551,6 @@ def main(argv: list[str] | None = None) -> None:
             route_key,
             session_id=session_id,
             page_plan=page_plan,
-            total_pages=total_pages_by_route.get(route_key),
         )
 
     log("=== Scraping Dentaltix completato ===")
