@@ -2,6 +2,7 @@
 
 import { ImproveGiuseppeDialog } from "@/app/components/feedback/ImproveGiuseppeDialog";
 import { HowItWorksButton } from "@/app/components/onboarding/HowItWorksButton";
+import { SITE_NAME, SITE_PAYOFF } from "@/app/lib/seo/site";
 import Image from "next/image";
 import { useState } from "react";
 
@@ -16,17 +17,17 @@ export function Footer() {
             <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-zinc-100 shadow-lg ring-2 ring-zinc-900/5 dark:bg-zinc-900 dark:ring-zinc-100/10 sm:h-16 sm:w-16">
               <Image
                 src="/giuseppe.jpeg"
-                alt="Giuseppe"
+                alt={SITE_NAME}
                 fill
                 className="object-cover"
               />
             </div>
             <div className="flex flex-col gap-0.5">
               <p className="text-2xl font-black uppercase tracking-tighter sm:text-3xl">
-                Giuseppe
+                {SITE_NAME}
               </p>
               <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                confronto prezzi e prodotti per studi dentistici
+                {SITE_PAYOFF}
               </p>
             </div>
           </div>

@@ -2,6 +2,9 @@
 export const SITE_URL = "https://www.giuseppeacquisti.it";
 export const SITE_NAME = "Giuseppe";
 export const SITE_EMAIL = "info@giuseppeacquisti.it";
+/** Payoff corto sotto al brand (footer, 404, …). */
+export const SITE_PAYOFF =
+  "confronto prezzi e prodotti per studi dentistici";
 
 /** Ecommerce attualmente confrontati. */
 export const COMPARED_ECOMMERCES = [
