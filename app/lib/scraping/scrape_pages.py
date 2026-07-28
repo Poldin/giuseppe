@@ -1,8 +1,15 @@
 from __future__ import annotations
 
 import re
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
+
+# In modalità auto: stop solo dopo N pagine consecutive senza dati / errore.
+EMPTY_STREAK_STOP = 10
+# Tentativi sulla stessa pagina in caso di errore di scraping (CDN, timeout, …).
+SCRAPE_RETRIES = 3
 
 
 @dataclass(frozen=True)
@@ -43,11 +50,46 @@ def _looks_like_page_list(raw: str) -> bool:
     return cleaned.startswith("[") or "," in cleaned
 
 
+def scrape_html_with_retries(
+    scrape_fn: Callable[[], str | None],
+    *,
+    log_fn: Callable[[str], None],
+    label: str,
+    page_number: int,
+    retries: int = SCRAPE_RETRIES,
+) -> str | None:
+    """Riprova la stessa pagina su errore temporaneo (html None)."""
+    html: str | None = None
+    for attempt in range(1, retries + 1):
+        html = scrape_fn()
+        if html is not None:
+            return html
+        if attempt < retries:
+            pause = 5.0 * attempt
+            log_fn(
+                f"[{label}] Pagina {page_number}: tentativo {attempt}/{retries} "
+                f"fallito, riprovo tra {pause:.0f}s"
+            )
+            time.sleep(pause)
+        else:
+            log_fn(
+                f"[{label}] Pagina {page_number}: "
+                f"tutti i {retries} tentativi falliti"
+            )
+    return html
+
+
 def prompt_page_plan() -> PagePlan:
     print()
     print("Quali pagine vuoi scrapare?")
-    print('  Invio / "y" → dalla pagina 1, continua finché trova dati')
-    print("  Numero N    → dalla pagina N, continua finché trova dati")
+    print(
+        f'  Invio / "y" → dalla pagina 1, continua '
+        f"(stop dopo {EMPTY_STREAK_STOP} pagine vuote di fila)"
+    )
+    print(
+        f"  Numero N    → dalla pagina N, continua "
+        f"(stop dopo {EMPTY_STREAK_STOP} pagine vuote di fila)"
+    )
     print("  [2,4,8]     → solo le pagine indicate (anche [2] per una sola pagina)")
 
     while True:

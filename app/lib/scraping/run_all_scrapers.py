@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from scrape_cli import prompt_yes_no, require_interactive_tty
-from scrape_pages import page_plan_to_dict, prompt_page_plan
+from scrape_pages import EMPTY_STREAK_STOP, page_plan_to_dict, prompt_page_plan
 from scrape_session import default_session_id
 
 SCRAPING_DIR = Path(__file__).resolve().parent
@@ -206,7 +206,10 @@ def prompt_session_id_global() -> str:
 
 def prompt_start_page_shared() -> int:
     print()
-    print("Dontalia: da quale pagina partire? (continua fino a pagina vuota)")
+    print(
+        f"Dontalia: da quale pagina partire? "
+        f"(stop dopo {EMPTY_STREAK_STOP} pagine vuote di fila)"
+    )
     print('  Invio / "y" → pagina 1')
     print("  Numero N    → pagina N")
 
@@ -517,14 +520,18 @@ def print_frecciarossa_summary(planned: list[PlannedJob]) -> None:
             if plan["mode"] == "list":
                 detail = f"pagine {plan['pages']}"
             else:
-                detail = f"da {plan['start_page']} (fino a pagina vuota)"
+                detail = (
+                    f"da {plan['start_page']} "
+                    f"(stop dopo {EMPTY_STREAK_STOP} vuote di fila)"
+                )
             print(f"  • {name}: rotte [{routes}]; {detail}")
             session_ids.add(config["session_id"])
         elif scraper["key"] == "dontalia":
             routes = ", ".join(config["routes"])
             print(
                 f"  • {name}: rotte [{routes}]; "
-                f"start page {config['start_page']} (fino a vuota)"
+                f"start page {config['start_page']} "
+                f"(stop dopo {EMPTY_STREAK_STOP} vuote di fila)"
             )
             session_ids.add(config["session_id"])
         elif scraper["key"] == "recalls_medical_device":

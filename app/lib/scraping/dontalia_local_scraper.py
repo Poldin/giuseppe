@@ -16,6 +16,7 @@ from supabase import create_client, Client
 
 from scrape_cli import load_config, parse_config_path, prompt_yes_no, require_interactive_tty
 from scrape_session import prompt_run_mode, prompt_session_id
+from scrape_pages import EMPTY_STREAK_STOP, scrape_html_with_retries
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 load_dotenv(ROOT_DIR / ".env.local")
@@ -86,8 +87,14 @@ def log(message: str) -> None:
 def prompt_start_page() -> int:
     print()
     print("Da quale pagina vuoi partire?")
-    print('  Invio / "y" → pagina 1, poi continua finché non trova una pagina vuota')
-    print("  Numero N    → pagina N, poi continua finché non trova una pagina vuota")
+    print(
+        f'  Invio / "y" → pagina 1, continua '
+        f"(stop dopo {EMPTY_STREAK_STOP} pagine vuote di fila)"
+    )
+    print(
+        f"  Numero N    → pagina N, continua "
+        f"(stop dopo {EMPTY_STREAK_STOP} pagine vuote di fila)"
+    )
 
     while True:
         raw = input("> ").strip().lower()
@@ -317,10 +324,46 @@ def scrape_page(
         try:
             log(f"[{route_label}] Pagina {page_number}: navigazione in corso (timeout 90s)...")
             page.goto(url, wait_until="domcontentloaded", timeout=90000)
-            log(f"[{route_label}] Pagina {page_number}: pagina caricata, titolo: {page.title()!r}")
+            title = page.title()
+            log(f"[{route_label}] Pagina {page_number}: pagina caricata, titolo: {title!r}")
+
+            title_lower = title.lower()
+            if (
+                "could not be satisfied" in title_lower
+                or title_lower.startswith("error:")
+                or "access denied" in title_lower
+                or "just a moment" in title_lower
+            ):
+                log(
+                    f"[{route_label}] Pagina {page_number}: "
+                    "blocco CDN/temporaneo rilevato"
+                )
+                return None
+
+            if (
+                "pagina non trovata" in title_lower
+                or "page not found" in title_lower
+                or "404" in title_lower
+            ):
+                log(
+                    f"[{route_label}] Pagina {page_number}: "
+                    "404 rilevata (pagina fuori catalogo)"
+                )
+                return page.content()
 
             dismiss_cookie_banner(page, page_number, route_label)
-            page.wait_for_selector(CATALOG_LIST_SELECTOR, timeout=45000)
+            try:
+                page.wait_for_selector(CATALOG_LIST_SELECTOR, timeout=45000)
+            except Exception:
+                html = page.content()
+                if "product-card" not in html:
+                    log(
+                        f"[{route_label}] Pagina {page_number}: "
+                        "nessuna product-card (pagina vuota)"
+                    )
+                    return html
+                raise
+
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             time.sleep(1.0)
 
@@ -330,6 +373,8 @@ def scrape_page(
                 f"[{route_label}] Pagina {page_number}: HTML scaricato "
                 f"({len(html):,} caratteri, {card_count} card nel catalogo)"
             )
+            if card_count < 1:
+                return html
         except Exception as e:
             log(
                 f"[{route_label}] Pagina {page_number}: "
@@ -452,7 +497,10 @@ def run_route(
     print()
     print(f"=== Configurazione rotta {label} ===")
     print(f"URL base: {base_url}")
-    print("Le pagine verranno scrapate in automatico finché non se ne trova una vuota.")
+    print(
+        f"Le pagine verranno scrapate in automatico "
+        f"(stop dopo {EMPTY_STREAK_STOP} pagine consecutive senza dati)."
+    )
 
     if start_page is None:
         start_page = prompt_start_page()
@@ -460,30 +508,49 @@ def run_route(
     if session_id is None:
         session_id = prompt_session_id(supabase, ECOMMERCE_ID, f"Dontalia {label}")
 
-    log(f"[{label}] Partenza da pagina {start_page}")
+    log(
+        f"[{label}] Partenza da pagina {start_page} "
+        f"(stop dopo {EMPTY_STREAK_STOP} vuote di fila)"
+    )
     log(f"[{label}] Session ID: {session_id}")
 
     page_number = start_page
     pages_scraped = 0
+    empty_streak = 0
 
     while page_number <= MAX_PAGES_PER_ROUTE:
         log(f"[{label}] --- Inizio pagina {page_number} ---")
 
-        html = scrape_page(page_number, label, base_url, main_family)
+        html = scrape_html_with_retries(
+            lambda p=page_number: scrape_page(p, label, base_url, main_family),
+            log_fn=log,
+            label=label,
+            page_number=page_number,
+        )
         result = parse_and_save(html, page_number, session_id, label)
 
-        if result == -1:
-            log(f"[{label}] Pagina {page_number}: nessun prodotto, fine rotta")
-            break
+        if result == 0:
+            empty_streak = 0
+            pages_scraped += 1
+        else:
+            empty_streak += 1
+            reason = "errore scraping" if result is None else "nessun prodotto"
+            log(
+                f"[{label}] Pagina {page_number}: {reason} "
+                f"(streak vuote {empty_streak}/{EMPTY_STREAK_STOP})"
+            )
+            if empty_streak >= EMPTY_STREAK_STOP:
+                log(
+                    f"[{label}] Stop: {EMPTY_STREAK_STOP} pagine consecutive "
+                    "senza dati"
+                )
+                break
 
-        if result is None:
-            log(f"[{label}] Pagina {page_number}: errore scraping, stop rotta")
-            break
-
-        pages_scraped += 1
         page_number += 1
 
         pause = random.uniform(2.5, 5.0)
+        if result != 0:
+            pause = random.uniform(5.0, 8.0)
         log(f"[{label}] Pagina {page_number - 1}: pausa {pause:.1f}s prima della prossima")
         time.sleep(pause)
 
