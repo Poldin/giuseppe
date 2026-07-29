@@ -5,6 +5,7 @@ import { ArrowUpRight, ChevronDown, X } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef } from "react";
 import { EcommerceLogoBadge } from "@/app/components/chat/EcommerceLogoBadge";
+import { QuantityControl } from "@/app/components/chat/QuantityControl";
 import type { InlineMatchCandidate } from "@/app/lib/search/inline-match";
 
 function formatEuro(value: number): string {
@@ -44,27 +45,55 @@ function GiuseppePulse() {
 
 function InlineMatchCard({
   match,
+  quantity,
   isSelected,
+  disabled = false,
   onSelect,
+  onQuantityChange,
 }: {
   match: InlineMatchCandidate;
+  quantity: number;
   isSelected: boolean;
+  disabled?: boolean;
   onSelect: () => void;
+  onQuantityChange: (next: number) => void;
 }) {
   const productUrl = match.original_url?.trim() || null;
   const discountPercent = formatDiscountPercent(match.discount);
+  const totalPrice = match.prezzo * quantity;
 
   const cardClassName = isSelected
     ? "border-[3px] border-zinc-900 bg-white shadow-md dark:border-zinc-100 dark:bg-zinc-950"
     : "border border-zinc-200/40 bg-white/25 opacity-75 dark:border-zinc-700/35 dark:bg-zinc-950/25";
 
+  const handleCardClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (disabled) return;
+    const target = event.target as HTMLElement;
+    if (target.closest("button, a, input")) return;
+    onSelect();
+  };
+
+  const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (disabled) return;
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    onSelect();
+  };
+
   return (
-    <button
-      type="button"
-      onClick={onSelect}
+    <div
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      onClick={handleCardClick}
+      onKeyDown={handleCardKeyDown}
       aria-pressed={isSelected}
+      aria-disabled={disabled || undefined}
       aria-label={`${isSelected ? "Selezionato" : "Seleziona"} ${match.product_name}`}
-      className={`relative flex h-full w-56 shrink-0 flex-col rounded-xl p-3 text-left transition-[opacity,box-shadow,border-color] hover:opacity-90 hover:shadow-sm sm:w-64 ${cardClassName}`}
+      className={`relative flex h-full w-56 shrink-0 flex-col rounded-xl p-3 text-left transition-[opacity,box-shadow,border-color] sm:w-64 ${
+        disabled
+          ? "cursor-not-allowed"
+          : "cursor-pointer hover:opacity-90 hover:shadow-sm"
+      } ${cardClassName}`}
     >
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
         <EcommerceLogoBadge logoUrl={match.logo_url} name={match.ecommerce_name} />
@@ -93,17 +122,31 @@ function InlineMatchCard({
         ) : null}
       </div>
 
-      <div className="mt-3 flex flex-col items-start gap-1">
-        {discountPercent ? (
-          <span className="inline-flex items-center rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-            ⬇️-{discountPercent}% sconto
-          </span>
-        ) : null}
-        <span className="text-base font-bold tabular-nums tracking-tight">
-          {formatEuro(match.prezzo)}
-        </span>
-      </div>
-    </button>
+      <div className="mt-3 flex flex-col gap-2">
+        <div className="flex flex-col items-start gap-1">
+          {discountPercent ? (
+            <span className="inline-flex items-center rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+              ⬇️-{discountPercent}% sconto
+            </span>
+          ) : null}
+          <div className="flex items-baseline gap-1.5">
+            {quantity > 1 ? (
+              <span className="text-[10px] tabular-nums text-zinc-500">
+                {formatEuro(match.prezzo)}
+              </span>
+            ) : null}
+            <span className="text-base font-bold tabular-nums tracking-tight">
+              {formatEuro(totalPrice)}
+            </span>
+          </div>
+        </div>
+
+        <QuantityControl
+          quantity={quantity}
+          onQuantityChange={onQuantityChange}
+          compact
+        />      </div>
+    </div>
   );
 }
 
@@ -114,20 +157,24 @@ export function InlineProductMatchRow({
   status,
   matches,
   selectedId,
+  quantities,
   expanded,
   disabled = false,
   onToggleExpanded,
   onSelectMatch,
+  onQuantityChange,
   onRemove,
 }: {
   query: string;
   status: InlineProductRowStatus;
   matches: InlineMatchCandidate[];
   selectedId: string | null;
+  quantities: Record<string, number>;
   expanded: boolean;
   disabled?: boolean;
   onToggleExpanded: () => void;
   onSelectMatch: (id: string) => void;
+  onQuantityChange: (matchId: string, next: number) => void;
   onRemove: () => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -136,6 +183,9 @@ export function InlineProductMatchRow({
 
   const selected =
     matches.find((match) => match.id === selectedId) ?? matches[0] ?? null;
+  const selectedQuantity = selected
+    ? Math.max(1, quantities[selected.id] ?? 1)
+    : 1;
   const canExpand = status === "ready" && matches.length > 0;
 
   useEffect(() => {
@@ -200,7 +250,7 @@ export function InlineProductMatchRow({
 
           {status === "ready" && selected ? (
             <motion.span
-              key={selected.id}
+              key={`${selected.id}-${selectedQuantity}`}
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.22, ease: "easeOut" }}
@@ -210,8 +260,13 @@ export function InlineProductMatchRow({
                 logoUrl={selected.logo_url}
                 name={selected.ecommerce_name}
               />
+              {selectedQuantity > 1 ? (
+                <span className="text-[10px] tabular-nums text-zinc-500">
+                  ×{selectedQuantity}
+                </span>
+              ) : null}
               <span className="text-sm font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
-                {formatEuro(selected.prezzo)}
+                {formatEuro(selected.prezzo * selectedQuantity)}
               </span>
             </motion.span>
           ) : null}
@@ -259,6 +314,7 @@ export function InlineProductMatchRow({
               <div className="flex w-max gap-2">
                 {matches.map((match, index) => {
                   const isSelected = selected?.id === match.id;
+                  const quantity = Math.max(1, quantities[match.id] ?? 1);
                   return (
                     <motion.div
                       key={match.id}
@@ -273,8 +329,13 @@ export function InlineProductMatchRow({
                     >
                       <InlineMatchCard
                         match={match}
+                        quantity={quantity}
                         isSelected={isSelected}
+                        disabled={disabled}
                         onSelect={() => onSelectMatch(match.id)}
+                        onQuantityChange={(next) =>
+                          onQuantityChange(match.id, next)
+                        }
                       />
                     </motion.div>
                   );

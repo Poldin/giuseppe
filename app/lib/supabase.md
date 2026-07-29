@@ -145,6 +145,9 @@ CREATE TABLE public.scraped_product (
   is_escluded boolean,
   update_session_id text,
   pub_slug text,
+  name_norm text DEFAULT lower(f_unaccent(COALESCE(product_name, ''::text))),
+  search_tsv tsvector DEFAULT to_tsvector('simple'::regconfig, f_unaccent(COALESCE(product_name, ''::text))),
+  search_tsv_it tsvector DEFAULT to_tsvector('italian'::regconfig, f_unaccent(COALESCE(product_name, ''::text))),
   CONSTRAINT scraped_product_pkey PRIMARY KEY (id),
   CONSTRAINT scraped_product_ecommerce_id_fkey FOREIGN KEY (ecommerce_id) REFERENCES public.ecommerce_brand(id)
 );
@@ -393,4 +396,20 @@ CREATE TABLE public.aifa_medicine_price_history (
   CONSTRAINT aifa_medicine_price_history_pkey PRIMARY KEY (id),
   CONSTRAINT aifa_medicine_price_history_medicine_id_fkey FOREIGN KEY (medicine_id) REFERENCES public.aifa_medicines(id),
   CONSTRAINT aifa_medicine_price_history_release_id_fkey FOREIGN KEY (release_id) REFERENCES public.aifa_releases(id)
+);
+CREATE TABLE public.homesearch_session (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  other jsonb,
+  CONSTRAINT homesearch_session_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.homesearch_query (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  session_id uuid,
+  query text,
+  results jsonb,
+  other jsonb,
+  CONSTRAINT homesearch_query_pkey PRIMARY KEY (id),
+  CONSTRAINT homesearch_query_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.homesearch_session(id)
 );

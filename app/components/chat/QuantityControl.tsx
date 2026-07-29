@@ -39,7 +39,7 @@ export function QuantityControl({
 
   return (
     <div
-      className="inline-flex shrink-0 items-center rounded-lg border border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900"
+      className="inline-flex w-fit shrink-0 items-center self-start rounded-lg border border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900"
       onClick={(event) => event.stopPropagation()}
     >
       <button

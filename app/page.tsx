@@ -3,6 +3,7 @@ import { HomeEcommerceBadges } from "@/app/components/home/HomeEcommerceBadges";
 import { HomeFaq } from "@/app/components/home/HomeFaq";
 import { HowItWorksButton } from "@/app/components/onboarding/HowItWorksButton";
 import { fetchRecentPublicProducts } from "@/app/lib/search/chat-store";
+import { getHomesearchSession } from "@/app/lib/search/homesearch-store";
 import { fetchEcommerceCatalog } from "@/app/lib/search/match-products";
 import {
   getFaqItems,
@@ -72,10 +73,18 @@ function getYesterdaySearchStats(now = new Date()) {
  */
 export const revalidate = 14400;
 
-export default async function Home() {
-  const [ecommerces, recentProducts] = await Promise.all([
+type PageProps = {
+  searchParams: Promise<{ src?: string }>;
+};
+
+export default async function Home({ searchParams }: PageProps) {
+  const { src: rawSrc } = await searchParams;
+  const src = typeof rawSrc === "string" ? rawSrc.trim() : "";
+
+  const [ecommerces, recentProducts, initialSession] = await Promise.all([
     fetchEcommerceCatalog(),
     fetchRecentPublicProducts(),
+    src ? getHomesearchSession(src) : Promise.resolve(null),
   ]);
   const yesterdayStats = getYesterdaySearchStats();
   const priceTransparency = getPriceTransparency();
@@ -128,7 +137,10 @@ export default async function Home() {
             </p>
           </div>
           <div className="mt-10">
-            <HomeSearchBox recentProducts={recentProducts} />
+            <HomeSearchBox
+              recentProducts={recentProducts}
+              initialSession={initialSession}
+            />
           </div>
         </section>
 
