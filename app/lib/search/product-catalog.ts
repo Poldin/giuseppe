@@ -1,5 +1,5 @@
 import { supabase } from "@/app/lib/SupabaseClient";
-import { matchProductsTrgmBatch } from "@/app/lib/search/match-products";
+import { matchProductsAxeBatch } from "@/app/lib/search/match-products";
 
 export type CatalogHit = {
   id: string;
@@ -26,7 +26,13 @@ export async function searchProductsSemantic(
     return [];
   }
 
-  const matches = await matchProductsTrgmBatch([trimmed]);
+  // Accetta leggera (non la vecchia trgm LIMIT 1000) — evita blocchi in combobox.
+  const t0 = Date.now();
+  console.log(`[combobox-search] START q="${trimmed}"`);
+  const matches = await matchProductsAxeBatch([trimmed], 80);
+  console.log(
+    `[combobox-search] axe ${Date.now() - t0}ms → raw=${matches.length}`
+  );
   const byName = new Map<string, CatalogHit>();
 
   for (const match of matches) {

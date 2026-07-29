@@ -62,48 +62,40 @@ export async function saveProductSearchChat(input: {
   return data.id;
 }
 
-export type RecentPublicSearch = {
-  id: string;
-  created_at: string;
-  query_text: string;
-  products: string[];
-};
-
-export async function fetchRecentPublicSearches(
-  limit = 15
-): Promise<RecentPublicSearch[]> {
+/** Prodotti singoli dalle ricerche pubbliche più recenti (deduplicati). */
+export async function fetchRecentPublicProducts(
+  limit = 20
+): Promise<string[]> {
   const { data, error } = await supabase
     .from("product_search_chats")
-    .select("id, created_at, query_text, products")
+    .select("products")
     .order("created_at", { ascending: false })
-    .limit(limit * 2);
+    .limit(Math.max(limit * 3, 40));
 
   if (error || !data) {
-    console.error("fetchRecentPublicSearches failed:", error);
+    console.error("fetchRecentPublicProducts failed:", error);
     return [];
   }
 
   const seen = new Set<string>();
-  const results: RecentPublicSearch[] = [];
+  const results: string[] = [];
 
   for (const row of data) {
     const products = Array.isArray(row.products)
       ? row.products.filter((item): item is string => typeof item === "string")
       : [];
-    if (products.length === 0) continue;
 
-    const key = products.map((p) => p.toLowerCase()).join("|");
-    if (seen.has(key)) continue;
-    seen.add(key);
+    for (const product of products) {
+      const trimmed = product.trim();
+      if (!trimmed) continue;
 
-    results.push({
-      id: row.id,
-      created_at: row.created_at,
-      query_text: row.query_text,
-      products,
-    });
+      const key = trimmed.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
 
-    if (results.length >= limit) break;
+      results.push(trimmed);
+      if (results.length >= limit) return results;
+    }
   }
 
   return results;

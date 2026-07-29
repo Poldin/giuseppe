@@ -101,6 +101,69 @@ export async function matchProductsTrgmBatch(
   }));
 }
 
+function isTransientAxeError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("statement timeout") ||
+    lower.includes("canceling statement") ||
+    lower.includes("timed out") ||
+    lower.includes("57014")
+  );
+}
+
+async function matchProductsAxeBatchOnce(
+  queryTexts: string[],
+  matchLimit: number
+): Promise<SupabaseMatch[]> {
+  const t0 = Date.now();
+  console.log(
+    `[axe-rpc] call texts=${JSON.stringify(queryTexts)} limit=${matchLimit}`
+  );
+
+  const { data, error } = await supabase.rpc("match_products_axe_batch", {
+    query_texts: queryTexts,
+    match_limit: matchLimit,
+  });
+
+  if (error) {
+    console.error(`[axe-rpc] ERROR after ${Date.now() - t0}ms:`, error.message);
+    throw new Error(`RPC match_products_axe_batch: ${error.message}`);
+  }
+
+  const rows = Array.isArray(data) ? data : [];
+  console.log(`[axe-rpc] ok ${Date.now() - t0}ms → ${rows.length} rows`);
+
+  return rows.map((row) => ({
+    query_index: Number(row.query_index),
+    id: String(row.id),
+    product_name: String(row.product_name ?? ""),
+    final_price: Number(row.final_price ?? 0),
+    ecommerce_id: String(row.ecommerce_id),
+    // score grezzo del layer (non è pg_trgm similarity)
+    similarity: Number(row.score ?? 0),
+    original_url: null,
+    discount: null,
+  }));
+}
+
+/** Accetta cascata L0→L1→L1b→L1c→L2 (max ~1000). `score` mappato su similarity. */
+export async function matchProductsAxeBatch(
+  queryTexts: string[],
+  matchLimit = 1000
+): Promise<SupabaseMatch[]> {
+  try {
+    return await matchProductsAxeBatchOnce(queryTexts, matchLimit);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!isTransientAxeError(message)) throw error;
+
+    // Cold cache / anon 3s timeout: one retry usually succeeds warmed.
+    console.warn(`[axe-rpc] transient timeout, retry once: ${message}`);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    return matchProductsAxeBatchOnce(queryTexts, matchLimit);
+  }
+}
+
 export async function fetchEcommerceCatalog(): Promise<EcommerceInfo[]> {
   const { data, error } = await supabase
     .from("ecommerce_brand")

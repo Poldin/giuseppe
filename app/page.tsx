@@ -2,7 +2,7 @@ import HomeSearchBox from "@/app/components/home/HomeSearchBox";
 import { HomeEcommerceBadges } from "@/app/components/home/HomeEcommerceBadges";
 import { HomeFaq } from "@/app/components/home/HomeFaq";
 import { HowItWorksButton } from "@/app/components/onboarding/HowItWorksButton";
-import { fetchRecentPublicSearches } from "@/app/lib/search/chat-store";
+import { fetchRecentPublicProducts } from "@/app/lib/search/chat-store";
 import { fetchEcommerceCatalog } from "@/app/lib/search/match-products";
 import {
   getFaqItems,
@@ -67,15 +67,15 @@ function getYesterdaySearchStats(now = new Date()) {
 }
 
 /**
- * Aggiorna almeno ogni ora così “ieri”, il conteggio e la data
- * di ultimo aggiornamento catalogo (soglia 12:00 Europe/Rome) restano coerenti.
+ * ISR ogni 4 ore: prodotti recenti, stats “ieri” e trasparenza prezzi
+ * restano freschi senza battere il DB a ogni visita.
  */
-export const revalidate = 3600;
+export const revalidate = 14400;
 
 export default async function Home() {
-  const [ecommerces, recentSearches] = await Promise.all([
+  const [ecommerces, recentProducts] = await Promise.all([
     fetchEcommerceCatalog(),
-    fetchRecentPublicSearches(),
+    fetchRecentPublicProducts(),
   ]);
   const yesterdayStats = getYesterdaySearchStats();
   const priceTransparency = getPriceTransparency();
@@ -128,7 +128,7 @@ export default async function Home() {
             </p>
           </div>
           <div className="mt-10">
-            <HomeSearchBox recentSearches={recentSearches} />
+            <HomeSearchBox recentProducts={recentProducts} />
           </div>
         </section>
 
