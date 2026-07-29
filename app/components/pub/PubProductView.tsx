@@ -1,8 +1,10 @@
 import { PubInlineComparison } from "@/app/components/pub/PubInlineComparison";
 import { PubProductActions } from "@/app/components/pub/PubProductActions";
 import { PubProductFaq } from "@/app/components/pub/PubProductFaq";
+import { PubRelatedProducts } from "@/app/components/pub/PubRelatedProducts";
 import type { PubProduct } from "@/app/lib/pub/product";
 import { formatPubPrice } from "@/app/lib/pub/product";
+import type { RelatedPubProduct } from "@/app/lib/pub/related";
 import { getPubProductFaqItems, pubHubPath } from "@/app/lib/seo/pub-product";
 import Link from "next/link";
 
@@ -13,7 +15,13 @@ function ecommerceHref(domain: string | null): string | null {
   return `https://${trimmed.replace(/^\/\//, "")}`;
 }
 
-export function PubProductView({ product }: { product: PubProduct }) {
+export function PubProductView({
+  product,
+  relatedProducts,
+}: {
+  product: PubProduct;
+  relatedProducts: RelatedPubProduct[];
+}) {
   const priceLabel = formatPubPrice(product.final_price);
   const shop = product.ecommerce;
   const shopHref = shop ? ecommerceHref(shop.domain) : null;
@@ -131,6 +139,12 @@ export function PubProductView({ product }: { product: PubProduct }) {
         />
 
         <PubInlineComparison productName={product.product_name} />
+
+        <PubRelatedProducts
+          fromProductId={product.id}
+          fromPubSlug={product.pub_slug}
+          products={relatedProducts}
+        />
 
         <PubProductFaq items={faqItems} />
       </main>

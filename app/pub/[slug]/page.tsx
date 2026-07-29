@@ -4,6 +4,7 @@ import {
   fetchPubProductBySlug,
   pubProductDisplayTitle,
 } from "@/app/lib/pub/product";
+import { fetchRelatedPubProducts } from "@/app/lib/pub/related";
 import {
   getPubProductDateModified,
   getPubProductJsonLd,
@@ -15,7 +16,7 @@ import { SITE_NAME } from "@/app/lib/seo/site";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-/** ISR: prezzi e dati catalogo si aggiornano almeno ogni 12 ore. */
+/** ISR: prezzi, catalogo e correlati si aggiornano almeno ogni 12 ore. */
 export const revalidate = 43200;
 
 type PubProductPageProps = {
@@ -80,6 +81,7 @@ export default async function PubProductPage({ params }: PubProductPageProps) {
     notFound();
   }
 
+  const relatedProducts = await fetchRelatedPubProducts(product);
   const jsonLd = getPubProductJsonLd(product);
 
   return (
@@ -88,7 +90,7 @@ export default async function PubProductPage({ params }: PubProductPageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <PubProductView product={product} />
+      <PubProductView product={product} relatedProducts={relatedProducts} />
       <ChatSponsoredBanner />
     </>
   );
