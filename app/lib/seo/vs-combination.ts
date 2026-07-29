@@ -12,6 +12,15 @@ import {
   type FaqItem,
 } from "@/app/lib/seo/site";
 
+export function vsHubPath(query?: string): string {
+  if (!query?.trim()) return "/vs";
+  return `/vs?q=${encodeURIComponent(query.trim())}`;
+}
+
+export function vsHubAbsoluteUrl(): string {
+  return `${SITE_URL}${vsHubPath()}`;
+}
+
 export function vsCombinationPath(slug: string): string {
   return `/vs/${encodeURIComponent(slug)}`;
 }
@@ -186,6 +195,12 @@ export function getVsCombinationJsonLd(combo: VsCombination, now = new Date()) {
           {
             "@type": "ListItem",
             position: 2,
+            name: "Confronti prezzi",
+            item: vsHubAbsoluteUrl(),
+          },
+          {
+            "@type": "ListItem",
+            position: 3,
             name: combo.canonical_name,
             item: canonicalUrl,
           },

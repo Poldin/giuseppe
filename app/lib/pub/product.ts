@@ -204,6 +204,124 @@ export async function fetchPubSitemapEntries(
   return entries;
 }
 
+export type PubHubHit = {
+  pub_slug: string;
+  product_name: string;
+  brand: string | null;
+  final_price: number | null;
+  shop_name: string | null;
+};
+
+export const PUB_HUB_RESULT_LIMIT = 20;
+
+function escapeIlikePattern(query: string): string | null {
+  const safe = query
+    .trim()
+    .replace(/[%_,]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return safe.length > 0 ? safe : null;
+}
+
+function mapPubHubRow(row: {
+  pub_slug?: unknown;
+  product_name?: unknown;
+  brand?: unknown;
+  final_price?: unknown;
+  ecommerce_brand?: unknown;
+}): PubHubHit | null {
+  const pub_slug =
+    typeof row.pub_slug === "string" && row.pub_slug.trim()
+      ? row.pub_slug.trim()
+      : null;
+  const product_name =
+    typeof row.product_name === "string" && row.product_name.trim()
+      ? row.product_name.trim()
+      : null;
+  if (!pub_slug || !product_name) return null;
+  const ecommerce = parseEcommerce(row.ecommerce_brand);
+  return {
+    pub_slug,
+    product_name,
+    brand: parseBrand(row.brand),
+    final_price:
+      row.final_price == null || Number.isNaN(Number(row.final_price))
+        ? null
+        : Number(row.final_price),
+    shop_name: ecommerce?.name ?? null,
+  };
+}
+
+/** Ultimi prodotti pubblici per hub (max 20) — niente dump completo. */
+export async function fetchPubHubSamples(
+  limit = PUB_HUB_RESULT_LIMIT
+): Promise<PubHubHit[]> {
+  const { data, error } = await supabase
+    .from("scraped_product")
+    .select(
+      `
+      pub_slug,
+      product_name,
+      brand,
+      final_price,
+      ecommerce_brand ( id, name, logo_url, domain )
+    `
+    )
+    .not("pub_slug", "is", null)
+    .or("is_escluded.is.null,is_escluded.eq.false")
+    .order("update_at", { ascending: false, nullsFirst: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(`Campione hub prodotti: ${error.message}`);
+  }
+
+  const hits: PubHubHit[] = [];
+  for (const row of data ?? []) {
+    const hit = mapPubHubRow(row);
+    if (hit) hits.push(hit);
+  }
+  return hits;
+}
+
+/** Ricerca hub prodotti (max 20). */
+export async function searchPubProducts(
+  query: string,
+  limit = PUB_HUB_RESULT_LIMIT
+): Promise<PubHubHit[]> {
+  const safe = escapeIlikePattern(query);
+  if (!safe) return [];
+  const pattern = `%${safe}%`;
+
+  const { data, error } = await supabase
+    .from("scraped_product")
+    .select(
+      `
+      pub_slug,
+      product_name,
+      brand,
+      final_price,
+      ecommerce_brand ( id, name, logo_url, domain )
+    `
+    )
+    .not("pub_slug", "is", null)
+    .or("is_escluded.is.null,is_escluded.eq.false")
+    .ilike("product_name", pattern)
+    .order("product_name", { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(`Ricerca hub prodotti: ${error.message}`);
+  }
+
+  const hits: PubHubHit[] = [];
+  for (const row of data ?? []) {
+    const hit = mapPubHubRow(row);
+    if (hit) hits.push(hit);
+  }
+  return hits;
+}
+
 export function formatPubPrice(price: number | null): string | null {
   if (price == null || Number.isNaN(price)) return null;
   return price.toLocaleString("it-IT", {

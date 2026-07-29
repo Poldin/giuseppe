@@ -208,3 +208,94 @@ export async function fetchRecallSitemapEntries(
 
   return entries;
 }
+
+export type RecallHubHit = {
+  numero_riferimento: string;
+  name: string;
+  fabbricante: string | null;
+  tipo_dispositivo: string | null;
+};
+
+export const RECALL_HUB_RESULT_LIMIT = 20;
+
+function escapeIlikePattern(query: string): string | null {
+  const safe = query
+    .trim()
+    .replace(/[%_,]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return safe.length > 0 ? safe : null;
+}
+
+function mapRecallHubRow(row: Record<string, unknown>): RecallHubHit | null {
+  const numero = asTrimmedString(row.numero_riferimento);
+  if (!numero) return null;
+  const nome = asTrimmedString(row.nome_dispositivo);
+  const titolo = asTrimmedString(row.titolo_rss);
+  return {
+    numero_riferimento: numero,
+    name: nome || titolo || `Avviso ${numero}`,
+    fabbricante: asTrimmedString(row.fabbricante),
+    tipo_dispositivo: asTrimmedString(row.tipo_dispositivo),
+  };
+}
+
+/** Ultimi avvisi pubblici per hub (max 20). */
+export async function fetchRecallHubSamples(
+  limit = RECALL_HUB_RESULT_LIMIT
+): Promise<RecallHubHit[]> {
+  const { data, error } = await supabase
+    .from("recalls_medical_device")
+    .select(
+      "numero_riferimento, nome_dispositivo, titolo_rss, fabbricante, tipo_dispositivo, data_acquisizione, created_at"
+    )
+    .not("numero_riferimento", "is", null)
+    .not("link_pagina", "is", null)
+    .order("data_acquisizione", { ascending: false, nullsFirst: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(`Campione hub avvisi: ${error.message}`);
+  }
+
+  const hits: RecallHubHit[] = [];
+  for (const row of data ?? []) {
+    const hit = mapRecallHubRow(row as Record<string, unknown>);
+    if (hit) hits.push(hit);
+  }
+  return hits;
+}
+
+/** Ricerca hub avvisi di sicurezza (max 20). */
+export async function searchRecalls(
+  query: string,
+  limit = RECALL_HUB_RESULT_LIMIT
+): Promise<RecallHubHit[]> {
+  const safe = escapeIlikePattern(query);
+  if (!safe) return [];
+  const pattern = `%${safe}%`;
+
+  const { data, error } = await supabase
+    .from("recalls_medical_device")
+    .select(
+      "numero_riferimento, nome_dispositivo, titolo_rss, fabbricante, tipo_dispositivo"
+    )
+    .not("numero_riferimento", "is", null)
+    .not("link_pagina", "is", null)
+    .or(
+      `nome_dispositivo.ilike."${pattern}",fabbricante.ilike."${pattern}",titolo_rss.ilike."${pattern}",numero_riferimento.ilike."${pattern}"`
+    )
+    .order("numero_riferimento", { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(`Ricerca hub avvisi: ${error.message}`);
+  }
+
+  const hits: RecallHubHit[] = [];
+  for (const row of data ?? []) {
+    const hit = mapRecallHubRow(row as Record<string, unknown>);
+    if (hit) hits.push(hit);
+  }
+  return hits;
+}

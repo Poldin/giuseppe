@@ -8,7 +8,7 @@ import {
   type VsCombination,
   type VsSide,
 } from "@/app/lib/vs/combination";
-import { getVsCombinationFaqItems } from "@/app/lib/seo/vs-combination";
+import { getVsCombinationFaqItems, vsHubPath } from "@/app/lib/seo/vs-combination";
 import { pubProductPath } from "@/app/lib/seo/pub-product";
 import { ArrowUpRight } from "lucide-react";
 import Link from "next/link";
@@ -182,6 +182,15 @@ export function VsComparisonView({
                 className="font-medium text-zinc-700 transition-colors hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
               >
                 Giuseppe
+              </Link>
+            </li>
+            <li aria-hidden="true">/</li>
+            <li>
+              <Link
+                href={vsHubPath()}
+                className="font-medium text-zinc-700 transition-colors hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+              >
+                Confronti prezzi
               </Link>
             </li>
             <li aria-hidden="true">/</li>

@@ -41,10 +41,11 @@ import {
   principioAttivoPath,
 } from "@/app/lib/seo/aifa";
 import { docsPath } from "@/app/lib/seo/docs";
-import { medicalDevicePath } from "@/app/lib/seo/medical-device";
+import { medicalDeviceHubPath, medicalDevicePath } from "@/app/lib/seo/medical-device";
 import { getNotazioneDentaleSitemapEntries } from "@/app/lib/seo/notazione-dentale";
-import { recallPath } from "@/app/lib/seo/recall";
-import { vsCombinationPath } from "@/app/lib/seo/vs-combination";
+import { pubHubPath } from "@/app/lib/seo/pub-product";
+import { recallHubPath, recallPath } from "@/app/lib/seo/recall";
+import { vsCombinationPath, vsHubPath } from "@/app/lib/seo/vs-combination";
 import { SITE_URL } from "@/app/lib/seo/site";
 import type { MetadataRoute } from "next";
 
@@ -112,6 +113,19 @@ export default async function sitemap(props: {
       changeFrequency: "weekly",
       priority: 0.8,
     });
+    for (const hub of [
+      { path: pubHubPath(), priority: 0.8 },
+      { path: vsHubPath(), priority: 0.8 },
+      { path: recallHubPath(), priority: 0.7 },
+      { path: medicalDeviceHubPath(), priority: 0.7 },
+    ]) {
+      entries.push({
+        url: `${SITE_URL}${hub.path}`,
+        lastModified: new Date(),
+        changeFrequency: "daily",
+        priority: hub.priority,
+      });
+    }
     // Hub + 32 denti: dati statici, niente DB.
     for (const entry of getNotazioneDentaleSitemapEntries()) {
       entries.push({

@@ -5,6 +5,7 @@ import {
 import {
   formatMedicalDeviceDateIt,
   getMedicalDeviceFaqItems,
+  medicalDeviceHubPath,
 } from "@/app/lib/seo/medical-device";
 import { ChevronDown } from "lucide-react";
 import Link from "next/link";
@@ -96,7 +97,14 @@ export function MedicalDeviceView({ device }: { device: MedicalDeviceRecord }) {
               </Link>
             </li>
             <li aria-hidden="true">/</li>
-            <li className="text-zinc-500">Dispositivi medici</li>
+            <li>
+              <Link
+                href={medicalDeviceHubPath()}
+                className="font-medium text-zinc-700 transition-colors hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+              >
+                Dispositivi medici
+              </Link>
+            </li>
             <li aria-hidden="true">/</li>
             <li className="truncate text-zinc-500">{name}</li>
           </ol>

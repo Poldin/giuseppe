@@ -3,7 +3,7 @@ import { PubProductFaq } from "@/app/components/pub/PubProductFaq";
 import { PubRelatedProducts } from "@/app/components/pub/PubRelatedProducts";
 import type { PubProduct } from "@/app/lib/pub/product";
 import { formatPubPrice } from "@/app/lib/pub/product";
-import { getPubProductFaqItems } from "@/app/lib/seo/pub-product";
+import { getPubProductFaqItems, pubHubPath } from "@/app/lib/seo/pub-product";
 import Link from "next/link";
 
 function ecommerceHref(domain: string | null): string | null {
@@ -47,6 +47,15 @@ export function PubProductView({ product }: { product: PubProduct }) {
                 className="font-medium text-zinc-700 transition-colors hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
               >
                 Giuseppe
+              </Link>
+            </li>
+            <li aria-hidden="true">/</li>
+            <li>
+              <Link
+                href={pubHubPath()}
+                className="font-medium text-zinc-700 transition-colors hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+              >
+                Prodotti
               </Link>
             </li>
             <li aria-hidden="true">/</li>

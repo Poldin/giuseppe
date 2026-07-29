@@ -474,6 +474,98 @@ export async function fetchVsSitemapEntries(
   return entries;
 }
 
+export type VsHubHit = {
+  slug: string;
+  title: string;
+  canonical_name: string;
+};
+
+export const VS_HUB_RESULT_LIMIT = 20;
+
+function escapeIlikePattern(query: string): string | null {
+  const safe = query
+    .trim()
+    .replace(/[%_,]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return safe.length > 0 ? safe : null;
+}
+
+function mapVsHubRow(row: {
+  slug?: unknown;
+  other?: unknown;
+}): VsHubHit | null {
+  const slug =
+    typeof row.slug === "string" && row.slug.trim() ? row.slug.trim() : null;
+  if (!slug) return null;
+  const other =
+    row.other && typeof row.other === "object" && !Array.isArray(row.other)
+      ? (row.other as CombinationOther)
+      : {};
+  const canonical =
+    asString(other.canonical_name) || asString(other.title) || slug;
+  const title = asString(other.title) || canonical;
+  return { slug, title, canonical_name: canonical };
+}
+
+/** Ultimi confronti cluster per hub (max 20). */
+export async function fetchVsHubSamples(
+  limit = VS_HUB_RESULT_LIMIT
+): Promise<VsHubHit[]> {
+  const { data, error } = await supabase
+    .from("product_combinations")
+    .select("slug, other, created_at")
+    .eq("is_active", true)
+    .not("slug", "is", null)
+    .filter("other->>kind", "eq", "cluster")
+    .order("created_at", { ascending: false, nullsFirst: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(`Campione hub confronti: ${error.message}`);
+  }
+
+  const hits: VsHubHit[] = [];
+  for (const row of data ?? []) {
+    const hit = mapVsHubRow(row);
+    if (hit) hits.push(hit);
+  }
+  return hits;
+}
+
+/** Ricerca hub confronti (max 20; solo cluster attivi). */
+export async function searchVsCombinations(
+  query: string,
+  limit = VS_HUB_RESULT_LIMIT
+): Promise<VsHubHit[]> {
+  const safe = escapeIlikePattern(query);
+  if (!safe) return [];
+  const pattern = `%${safe}%`;
+
+  const { data, error } = await supabase
+    .from("product_combinations")
+    .select("slug, other")
+    .eq("is_active", true)
+    .not("slug", "is", null)
+    .filter("other->>kind", "eq", "cluster")
+    .or(
+      `other->>canonical_name.ilike."${pattern}",other->>title.ilike."${pattern}",slug.ilike."${pattern}"`
+    )
+    .order("slug", { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(`Ricerca hub confronti: ${error.message}`);
+  }
+
+  const hits: VsHubHit[] = [];
+  for (const row of data ?? []) {
+    const hit = mapVsHubRow(row);
+    if (hit) hits.push(hit);
+  }
+  return hits;
+}
+
 export function formatVsPrice(price: number | null): string | null {
   if (price == null || Number.isNaN(price)) return null;
   return price.toLocaleString("it-IT", {

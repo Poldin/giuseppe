@@ -10,6 +10,15 @@ import {
   type FaqItem,
 } from "@/app/lib/seo/site";
 
+export function pubHubPath(query?: string): string {
+  if (!query?.trim()) return "/pub";
+  return `/pub?q=${encodeURIComponent(query.trim())}`;
+}
+
+export function pubHubAbsoluteUrl(): string {
+  return `${SITE_URL}${pubHubPath()}`;
+}
+
 export function pubProductPath(slug: string): string {
   return `/pub/${encodeURIComponent(slug)}`;
 }
@@ -157,6 +166,12 @@ export function getPubProductJsonLd(product: PubProduct, now = new Date()) {
           {
             "@type": "ListItem",
             position: 2,
+            name: "Prodotti",
+            item: pubHubAbsoluteUrl(),
+          },
+          {
+            "@type": "ListItem",
+            position: 3,
             name: product.product_name,
             item: url,
           },

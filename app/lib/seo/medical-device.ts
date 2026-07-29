@@ -4,6 +4,15 @@ import {
 } from "@/app/lib/medical-device/device";
 import { SITE_NAME, SITE_URL, type FaqItem } from "@/app/lib/seo/site";
 
+export function medicalDeviceHubPath(query?: string): string {
+  if (!query?.trim()) return "/medical_device";
+  return `/medical_device?q=${encodeURIComponent(query.trim())}`;
+}
+
+export function medicalDeviceHubAbsoluteUrl(): string {
+  return `${SITE_URL}${medicalDeviceHubPath()}`;
+}
+
 export function medicalDevicePath(slug: string): string {
   return `/medical_device/${encodeURIComponent(slug)}`;
 }
@@ -191,6 +200,12 @@ export function getMedicalDeviceJsonLd(device: MedicalDeviceRecord) {
           {
             "@type": "ListItem",
             position: 2,
+            name: "Dispositivi medici",
+            item: medicalDeviceHubAbsoluteUrl(),
+          },
+          {
+            "@type": "ListItem",
+            position: 3,
             name,
             item: url,
           },

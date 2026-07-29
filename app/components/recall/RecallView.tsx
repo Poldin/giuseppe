@@ -5,6 +5,7 @@ import {
 import {
   formatRecallDateIt,
   getRecallFaqItems,
+  recallHubPath,
 } from "@/app/lib/seo/recall";
 import { ArrowUpRight, ChevronDown, FileText } from "lucide-react";
 import Link from "next/link";
@@ -72,7 +73,14 @@ export function RecallView({ recall }: { recall: RecallRecord }) {
               </Link>
             </li>
             <li aria-hidden="true">/</li>
-            <li className="text-zinc-500">Avvisi di sicurezza</li>
+            <li>
+              <Link
+                href={recallHubPath()}
+                className="font-medium text-zinc-700 transition-colors hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+              >
+                Avvisi di sicurezza
+              </Link>
+            </li>
             <li aria-hidden="true">/</li>
             <li className="truncate text-zinc-500">{name}</li>
           </ol>

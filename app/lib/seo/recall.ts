@@ -4,6 +4,15 @@ import {
 } from "@/app/lib/recall/recall";
 import { SITE_NAME, SITE_URL, type FaqItem } from "@/app/lib/seo/site";
 
+export function recallHubPath(query?: string): string {
+  if (!query?.trim()) return "/recall";
+  return `/recall?q=${encodeURIComponent(query.trim())}`;
+}
+
+export function recallHubAbsoluteUrl(): string {
+  return `${SITE_URL}${recallHubPath()}`;
+}
+
 export function recallPath(numero: string): string {
   return `/recall/${encodeURIComponent(numero)}`;
 }
@@ -160,6 +169,12 @@ export function getRecallJsonLd(recall: RecallRecord) {
           {
             "@type": "ListItem",
             position: 2,
+            name: "Avvisi di sicurezza",
+            item: recallHubAbsoluteUrl(),
+          },
+          {
+            "@type": "ListItem",
+            position: 3,
             name,
             item: url,
           },

@@ -207,3 +207,93 @@ export async function fetchMedicalDeviceSitemapEntries(
 
   return entries;
 }
+
+export type MedicalDeviceHubHit = {
+  slug: string;
+  name: string;
+  fabbricante: string | null;
+  classificazione_cnd: string | null;
+};
+
+export const MEDICAL_DEVICE_HUB_RESULT_LIMIT = 20;
+
+function escapeIlikePattern(query: string): string | null {
+  const safe = query
+    .trim()
+    .replace(/[%_,]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return safe.length > 0 ? safe : null;
+}
+
+function mapDeviceHubRow(row: Record<string, unknown>): MedicalDeviceHubHit | null {
+  const slug = asTrimmedString(row.slug);
+  if (!slug) return null;
+  const name =
+    asTrimmedString(row.denominazione_commerciale) ||
+    `Dispositivo ${asTrimmedString(row.progressivo_dm_ass) ?? slug}`;
+  return {
+    slug,
+    name,
+    fabbricante: asTrimmedString(row.fabbricante_assemblatore),
+    classificazione_cnd: asTrimmedString(row.classificazione_cnd),
+  };
+}
+
+/** Ultimi dispositivi pubblici per hub (max 20). */
+export async function fetchMedicalDeviceHubSamples(
+  limit = MEDICAL_DEVICE_HUB_RESULT_LIMIT
+): Promise<MedicalDeviceHubHit[]> {
+  const { data, error } = await supabase
+    .from("medical_devices")
+    .select(
+      "slug, denominazione_commerciale, progressivo_dm_ass, fabbricante_assemblatore, classificazione_cnd, updated_at"
+    )
+    .not("slug", "is", null)
+    .order("updated_at", { ascending: false, nullsFirst: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(`Campione hub dispositivi: ${error.message}`);
+  }
+
+  const hits: MedicalDeviceHubHit[] = [];
+  for (const row of data ?? []) {
+    const hit = mapDeviceHubRow(row as Record<string, unknown>);
+    if (hit) hits.push(hit);
+  }
+  return hits;
+}
+
+/** Ricerca hub dispositivi medici (max 20). */
+export async function searchMedicalDevices(
+  query: string,
+  limit = MEDICAL_DEVICE_HUB_RESULT_LIMIT
+): Promise<MedicalDeviceHubHit[]> {
+  const safe = escapeIlikePattern(query);
+  if (!safe) return [];
+  const pattern = `%${safe}%`;
+
+  const { data, error } = await supabase
+    .from("medical_devices")
+    .select(
+      "slug, denominazione_commerciale, progressivo_dm_ass, fabbricante_assemblatore, classificazione_cnd"
+    )
+    .not("slug", "is", null)
+    .or(
+      `denominazione_commerciale.ilike."${pattern}",fabbricante_assemblatore.ilike."${pattern}",progressivo_dm_ass.ilike."${pattern}",classificazione_cnd.ilike."${pattern}"`
+    )
+    .order("denominazione_commerciale", { ascending: true, nullsFirst: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(`Ricerca hub dispositivi: ${error.message}`);
+  }
+
+  const hits: MedicalDeviceHubHit[] = [];
+  for (const row of data ?? []) {
+    const hit = mapDeviceHubRow(row as Record<string, unknown>);
+    if (hit) hits.push(hit);
+  }
+  return hits;
+}
