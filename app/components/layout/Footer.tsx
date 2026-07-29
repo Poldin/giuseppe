@@ -1,6 +1,7 @@
 "use client";
 
 import { ImproveGiuseppeDialog } from "@/app/components/feedback/ImproveGiuseppeDialog";
+import { GiuseppeCompareCta } from "@/app/components/layout/GiuseppeCompareCta";
 import { HowItWorksButton } from "@/app/components/onboarding/HowItWorksButton";
 import { SITE_NAME, SITE_PAYOFF } from "@/app/lib/seo/site";
 import Image from "next/image";
@@ -44,18 +45,7 @@ export function Footer() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-3">
-            <Link
-              href="/"
-              className="inline-flex w-fit items-center justify-center rounded-xl bg-zinc-900 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white"
-            >
-              Confronta prezzi e prodotti
-            </Link>
-            <p className="text-sm leading-relaxed text-zinc-500">
-              Indica i prodotti che ti servono in studio: Giuseppe confronta le
-              offerte e ti aiuta a scegliere la combinazione migliore.
-            </p>
-          </div>
+          <GiuseppeCompareCta />
 
           <nav className="flex flex-col items-start gap-2" aria-label="Azioni">
             <HowItWorksButton />

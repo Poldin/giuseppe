@@ -1,9 +1,9 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUpRight, ChevronDown, X } from "lucide-react";
+import { ArrowUpRight, ChevronDown, ChevronLeft, ChevronRight, X } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { EcommerceLogoBadge } from "@/app/components/chat/EcommerceLogoBadge";
 import { QuantityControl } from "@/app/components/chat/QuantityControl";
 import type { InlineMatchCandidate } from "@/app/lib/search/inline-match";
@@ -182,6 +182,8 @@ export function InlineProductMatchRow({
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedCardRef = useRef<HTMLDivElement>(null);
   const wasExpandedRef = useRef(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   const selected =
     matches.find((match) => match.id === selectedId) ?? matches[0] ?? null;
@@ -189,6 +191,14 @@ export function InlineProductMatchRow({
     ? Math.max(1, quantities[selected.id] ?? 1)
     : 1;
   const canExpand = status === "ready" && matches.length > 0;
+
+  const updateScrollState = useCallback(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const maxScroll = element.scrollWidth - element.clientWidth;
+    setCanScrollLeft(element.scrollLeft > 4);
+    setCanScrollRight(element.scrollLeft < maxScroll - 4);
+  }, []);
 
   useEffect(() => {
     if (!expanded || !canExpand) {
@@ -215,11 +225,47 @@ export function InlineProductMatchRow({
         (containerRect.width - cardRect.width) / 2;
 
       container.scrollTo({ left: Math.max(0, nextLeft), behavior: "auto" });
+      updateScrollState();
     };
 
     const timeout = window.setTimeout(scrollToSelected, 240);
     return () => window.clearTimeout(timeout);
-  }, [expanded, canExpand]);
+  }, [expanded, canExpand, updateScrollState]);
+
+  useEffect(() => {
+    if (!expanded || !canExpand) return;
+
+    const element = scrollRef.current;
+    if (!element) return;
+
+    updateScrollState();
+    element.addEventListener("scroll", updateScrollState, { passive: true });
+    const resizeObserver = new ResizeObserver(updateScrollState);
+    resizeObserver.observe(element);
+
+    return () => {
+      element.removeEventListener("scroll", updateScrollState);
+      resizeObserver.disconnect();
+    };
+  }, [expanded, canExpand, matches.length, updateScrollState]);
+
+  const scrollStrip = (direction: "left" | "right") => {
+    const element = scrollRef.current;
+    if (!element) return;
+
+    const track = element.firstElementChild;
+    const firstCard = track?.firstElementChild as HTMLElement | null;
+    const amount = firstCard
+      ? firstCard.offsetWidth + 8
+      : Math.max(200, Math.round(element.clientWidth * 0.8));
+
+    element.scrollBy({
+      left: direction === "left" ? -amount : amount,
+      behavior: "smooth",
+    });
+  };
+
+  const showScrollControls = canScrollLeft || canScrollRight;
 
   return (
     <li className="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900/50">
@@ -307,10 +353,34 @@ export function InlineProductMatchRow({
             transition={{ duration: 0.22, ease: "easeOut" }}
             className="overflow-hidden border-t border-zinc-100 dark:border-zinc-800"
           >
-            <p className="px-3 pt-2.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
-              {matches.length}{" "}
-              {matches.length === 1 ? "risultato" : "risultati"}
-            </p>
+            <div className="flex items-center justify-between gap-2 px-3 pt-2.5">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                {matches.length}{" "}
+                {matches.length === 1 ? "risultato" : "risultati"}
+              </p>
+              {showScrollControls ? (
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => scrollStrip("left")}
+                    disabled={!canScrollLeft || disabled}
+                    aria-label="Scorri offerte a sinistra"
+                    className="rounded-md p-1 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => scrollStrip("right")}
+                    disabled={!canScrollRight || disabled}
+                    aria-label="Scorri offerte a destra"
+                    className="rounded-md p-1 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : null}
+            </div>
             <div
               ref={scrollRef}
               className="overflow-x-auto px-3 pb-3 pt-2 scrollbar-thin [scrollbar-color:rgb(212_212_216)_transparent] [scrollbar-width:thin] dark:[scrollbar-color:rgb(82_82_91)_transparent] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-300/70 [&::-webkit-scrollbar-track]:bg-transparent dark:[&::-webkit-scrollbar-thumb]:bg-zinc-600/60"
