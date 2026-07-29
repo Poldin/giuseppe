@@ -14,16 +14,16 @@ import type { Metadata } from "next";
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "Confronti prezzi dentali — cerca prodotto vs prodotto",
-  description: `Cerca confronti prezzi tra ecommerce dentali su ${SITE_NAME}: stesso prodotto, shop diversi, differenza di prezzo in chiaro.`,
+  title: "Confronti prezzi dentali — miglior prezzo tra shop",
+  description: `Cerca il miglior prezzo tra ecommerce dentali su ${SITE_NAME}: stesso prodotto, shop diversi, differenza di prezzo in chiaro.`,
   alternates: { canonical: vsHubPath() },
   openGraph: {
     type: "website",
     locale: "it_IT",
     url: vsHubAbsoluteUrl(),
     siteName: SITE_NAME,
-    title: `Confronti prezzi | ${SITE_NAME}`,
-    description: `Trova il confronto prezzi tra shop dentali su ${SITE_NAME}.`,
+    title: `Miglior prezzo a confronto | ${SITE_NAME}`,
+    description: `Trova il miglior prezzo tra shop dentali su ${SITE_NAME}.`,
     images: [
       {
         url: "/giuseppe.jpeg",
@@ -48,8 +48,8 @@ export default async function VsHubPage({ searchParams }: PageProps) {
     <SeoHubSearch
       hubPath={vsHubPath()}
       breadcrumbLabel="Confronti prezzi"
-      title="Cerca confronti prezzi"
-      description="Stesso prodotto, shop diversi: differenza di prezzo in chiaro. Digita un nome: mostriamo fino a 20 risultati."
+      title="Cerca il miglior prezzo"
+      description="Stesso prodotto, shop diversi: trova il miglior prezzo e la differenza in chiaro. Digita un nome: mostriamo fino a 20 risultati."
       searchLabel="Cerca confronto"
       placeholder="Es. guanti, composite, abutment"
       emptyHint="Digita un prodotto per trovare i confronti disponibili."
@@ -58,7 +58,7 @@ export default async function VsHubPage({ searchParams }: PageProps) {
       hits={rows.map((hit) => ({
         href: vsCombinationPath(hit.slug),
         title: hit.canonical_name,
-        hint: "Apri confronto prezzi",
+        hint: "Apri miglior prezzo",
       }))}
     />
   );

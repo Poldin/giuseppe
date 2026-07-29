@@ -54,12 +54,12 @@ export function getVsCombinationMetaDescription(combo: VsCombination): string {
 
   if (diff && combo.cheaper_shop_name && (combo.price_diff ?? 0) > 0) {
     if (n > 2) {
-      return `Confronto prezzi ${name} su ${n} shop (${shops}). Su ${combo.cheaper_shop_name} risparmi fino a ${diff}. Confronta offerte per studi dentistici con ${SITE_NAME}. Il prezzo finale e l’IVA vanno verificati sul sito del rivenditore.`;
+      return `Miglior prezzo di ${name} tra ${n} shop (${shops}): su ${combo.cheaper_shop_name} risparmi fino a ${diff}. Confronto offerte per studi dentistici con ${SITE_NAME}. Il prezzo finale e l’IVA vanno verificati sul sito del rivenditore.`;
     }
-    return `Confronto prezzi ${name}: ${shops}. Su ${combo.cheaper_shop_name} risparmi ${diff}. Confronta offerte per studi dentistici con ${SITE_NAME}. Il prezzo finale e l’IVA vanno verificati sul sito del rivenditore.`;
+    return `Miglior prezzo di ${name} tra ${shops}: su ${combo.cheaper_shop_name} risparmi ${diff}. Confronto offerte per studi dentistici con ${SITE_NAME}. Il prezzo finale e l’IVA vanno verificati sul sito del rivenditore.`;
   }
 
-  return `Confronto prezzi ${name}: ${shops}. Confronta offerte per studi dentistici con ${SITE_NAME}. Il prezzo finale e l’IVA vanno verificati sul sito del rivenditore.`;
+  return `Miglior prezzo e confronto di ${name}: ${shops}. Confronta offerte per studi dentistici con ${SITE_NAME}. Il prezzo finale e l’IVA vanno verificati sul sito del rivenditore.`;
 }
 
 function sidePriceLabel(side: VsSide): string {
@@ -81,11 +81,25 @@ export function getVsCombinationFaqItems(
   const priced = combo.sides.filter(
     (s) => !s.is_escluded && s.final_price != null
   );
+  const bestSide =
+    priced.find((s) => s.rank === 1) ??
+    [...priced].sort(
+      (a, b) => Number(a.final_price) - Number(b.final_price)
+    )[0];
+  const bestPrice = bestSide ? formatVsPrice(bestSide.final_price) : null;
+
+  const bestShopName =
+    combo.cheaper_shop_name ?? bestSide?.ecommerce.name ?? null;
 
   const cheaperAnswer =
     diff && combo.cheaper_shop_name && (combo.price_diff ?? 0) > 0
       ? `Secondo il catalogo di ${SITE_NAME}, ${name} conviene di più su ${combo.cheaper_shop_name}: differenza fino a ${diff} rispetto alle altre offerte (${priced.map(sidePriceLabel).join("; ")}). I prezzi sono di catalogo; verifica sempre sul sito del rivenditore.`
       : `Per ${name} confrontiamo ${vsShopNamesLabel(combo)}: ${combo.sides.map(sidePriceLabel).join("; ")}. Verifica sempre prezzo e disponibilità sul sito del rivenditore.`;
+
+  const bestPriceAnswer =
+    bestPrice && bestShopName
+      ? `Tra gli shop confrontati su ${SITE_NAME}, il miglior prezzo di catalogo per ${name} è ${bestPrice} su ${bestShopName}. Non è un prezzo assoluto di mercato: confrontiamo solo i rivenditori indicati in pagina. Verifica sempre prezzo finale e IVA sul sito del rivenditore.`
+      : `Per ${name} confrontiamo ${vsShopNamesLabel(combo)}: ${combo.sides.map(sidePriceLabel).join("; ")}. Il miglior prezzo tra quelli disponibili va verificato sul sito del rivenditore (prezzo finale e IVA).`;
 
   const pricesQuestion =
     combo.sides.length > 2
@@ -93,6 +107,10 @@ export function getVsCombinationFaqItems(
       : `Qual è il prezzo di ${name} su ${combo.sides[0]?.ecommerce.name ?? "shop A"} e ${combo.sides[1]?.ecommerce.name ?? "shop B"}?`;
 
   return [
+    {
+      question: `Qual è il miglior prezzo di ${name}?`,
+      answer: bestPriceAnswer,
+    },
     {
       question: `Dove costa meno ${name}?`,
       answer: cheaperAnswer,
@@ -173,7 +191,7 @@ export function getVsCombinationJsonLd(combo: VsCombination, now = new Date()) {
       {
         "@type": "ItemList",
         "@id": `${url}#offers`,
-        name: `Confronto ${vsShopNamesLabel(combo)}`,
+        name: `Miglior prezzo — confronto ${vsShopNamesLabel(combo)}`,
         numberOfItems: combo.sides.length,
         itemListElement: combo.sides.map((side, index) => ({
           "@type": "ListItem",

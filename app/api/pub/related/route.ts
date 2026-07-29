@@ -1,3 +1,4 @@
+import { isCrawlerUserAgent } from "@/app/lib/http/crawler";
 import {
   fetchPubProductBySlug,
 } from "@/app/lib/pub/product";
@@ -5,14 +6,6 @@ import { fetchRelatedPubProducts } from "@/app/lib/pub/related";
 import { NextResponse } from "next/server";
 
 const RELATED_CACHE_SECONDS = 43_200;
-
-/** Bot ufficiali / crawler: niente trgm. */
-function isCrawlerUserAgent(userAgent: string | null): boolean {
-  if (!userAgent) return false;
-  return /bot|crawler|spider|slurp|facebookexternalhit|embedly|quora link preview|bingpreview|linkedinbot|skypeuripreview|applebot|semrush|ahrefs|mj12bot|dotbot|gptbot|claudebot|google-extended|bytespider|amazonbot|petalbot|duckduckbot|yandex/i.test(
-    userAgent
-  );
-}
 
 export async function GET(request: Request) {
   const userAgent = request.headers.get("user-agent");

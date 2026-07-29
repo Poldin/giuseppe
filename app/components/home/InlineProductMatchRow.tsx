@@ -160,6 +160,7 @@ export function InlineProductMatchRow({
   quantities,
   expanded,
   disabled = false,
+  showRemove = true,
   onToggleExpanded,
   onSelectMatch,
   onQuantityChange,
@@ -172,10 +173,11 @@ export function InlineProductMatchRow({
   quantities: Record<string, number>;
   expanded: boolean;
   disabled?: boolean;
+  showRemove?: boolean;
   onToggleExpanded: () => void;
   onSelectMatch: (id: string) => void;
   onQuantityChange: (matchId: string, next: number) => void;
-  onRemove: () => void;
+  onRemove?: () => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedCardRef = useRef<HTMLDivElement>(null);
@@ -282,15 +284,17 @@ export function InlineProductMatchRow({
           ) : null}
         </button>
 
-        <button
-          type="button"
-          onClick={onRemove}
-          disabled={disabled}
-          aria-label={`Rimuovi ${query}`}
-          className="rounded-full p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-        >
-          <X size={14} />
-        </button>
+        {showRemove && onRemove ? (
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={disabled}
+            aria-label={`Rimuovi ${query}`}
+            className="rounded-full p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+          >
+            <X size={14} />
+          </button>
+        ) : null}
       </div>
 
       <AnimatePresence initial={false}>

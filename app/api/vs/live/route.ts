@@ -1,15 +1,8 @@
+import { isCrawlerUserAgent } from "@/app/lib/http/crawler";
 import { fetchVsCombinationBySlug } from "@/app/lib/vs/combination";
 import { NextResponse } from "next/server";
 
 const LIVE_CACHE_SECONDS = 43_200;
-
-/** Bot ufficiali / crawler: niente refresh live. */
-function isCrawlerUserAgent(userAgent: string | null): boolean {
-  if (!userAgent) return false;
-  return /bot|crawler|spider|slurp|facebookexternalhit|embedly|quora link preview|bingpreview|linkedinbot|skypeuripreview|applebot|semrush|ahrefs|mj12bot|dotbot|gptbot|claudebot|google-extended|bytespider|amazonbot|petalbot|duckduckbot|yandex/i.test(
-    userAgent
-  );
-}
 
 export async function GET(request: Request) {
   const userAgent = request.headers.get("user-agent");

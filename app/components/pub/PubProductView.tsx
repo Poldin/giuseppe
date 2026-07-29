@@ -1,6 +1,6 @@
+import { PubInlineComparison } from "@/app/components/pub/PubInlineComparison";
 import { PubProductActions } from "@/app/components/pub/PubProductActions";
 import { PubProductFaq } from "@/app/components/pub/PubProductFaq";
-import { PubRelatedProducts } from "@/app/components/pub/PubRelatedProducts";
 import type { PubProduct } from "@/app/lib/pub/product";
 import { formatPubPrice } from "@/app/lib/pub/product";
 import { getPubProductFaqItems, pubHubPath } from "@/app/lib/seo/pub-product";
@@ -126,15 +126,11 @@ export function PubProductView({ product }: { product: PubProduct }) {
         ) : null}
 
         <PubProductActions
-          productName={product.product_name}
           productUrl={productUrl}
           ecommerceName={shop?.name ?? null}
         />
 
-        <PubRelatedProducts
-          fromProductId={product.id}
-          fromPubSlug={product.pub_slug}
-        />
+        <PubInlineComparison productName={product.product_name} />
 
         <PubProductFaq items={faqItems} />
       </main>

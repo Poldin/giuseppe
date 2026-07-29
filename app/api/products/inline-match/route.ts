@@ -1,9 +1,18 @@
-import { NextResponse } from "next/server";
+import { isCrawlerUserAgent } from "@/app/lib/http/crawler";
 import { runInlineProductMatch } from "@/app/lib/search/inline-match";
+import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   const t0 = Date.now();
   try {
+    const userAgent = request.headers.get("user-agent");
+    if (isCrawlerUserAgent(userAgent)) {
+      return NextResponse.json({
+        matches: [],
+        selectedId: null,
+      });
+    }
+
     const body = (await request.json()) as { query?: unknown };
     const query = typeof body.query === "string" ? body.query.trim() : "";
 

@@ -72,7 +72,7 @@ function SideCard({ side }: { side: VsSide }) {
   const productUrl = side.original_url?.trim() || null;
   const rankLabel =
     side.rank === 1
-      ? "Primo prezzo"
+      ? "Miglior prezzo"
       : side.rank === 2
         ? "Secondo prezzo"
         : side.rank === 3
@@ -200,7 +200,7 @@ export function VsComparisonView({
 
         <header className="flex flex-col gap-3">
           <p className="text-xs font-bold uppercase tracking-wide text-zinc-500">
-            Confronto prezzi
+            Miglior prezzo a confronto
           </p>
           <h1 className="text-2xl font-black uppercase leading-tight tracking-tighter sm:text-3xl">
             {combo.canonical_name}
@@ -221,7 +221,7 @@ export function VsComparisonView({
                 {diffLabel}
               </p>
               <p className="mt-1 text-sm font-medium text-zinc-600 dark:text-zinc-300">
-                conviene di più su {combo.cheaper_shop_name}
+                miglior prezzo su {combo.cheaper_shop_name}
               </p>
             </>
           ) : diffLabel && combo.price_diff === 0 ? (
