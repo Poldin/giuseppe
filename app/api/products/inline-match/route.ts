@@ -12,16 +12,16 @@ export async function POST(request: Request) {
     if (query.length < 2) {
       console.log(`[api/inline-match] reject: query troppo corta`);
       return NextResponse.json(
-        { error: "Query troppo corta", matches: [] },
+        { error: "Query troppo corta", matches: [], selectedId: null },
         { status: 400 }
       );
     }
 
-    const matches = await runInlineProductMatch(query);
+    const { matches, selectedId } = await runInlineProductMatch(query);
     console.log(
-      `[api/inline-match] OK query="${query}" matches=${matches.length} http=${Date.now() - t0}ms`
+      `[api/inline-match] OK query="${query}" matches=${matches.length} selected=${selectedId} http=${Date.now() - t0}ms`
     );
-    return NextResponse.json({ query, matches });
+    return NextResponse.json({ query, matches, selectedId });
   } catch (error) {
     console.error(
       `[api/inline-match] FAIL after ${Date.now() - t0}ms:`,
@@ -29,6 +29,9 @@ export async function POST(request: Request) {
     );
     const message =
       error instanceof Error ? error.message : "Errore durante il confronto";
-    return NextResponse.json({ error: message, matches: [] }, { status: 500 });
+    return NextResponse.json(
+      { error: message, matches: [], selectedId: null },
+      { status: 500 }
+    );
   }
 }

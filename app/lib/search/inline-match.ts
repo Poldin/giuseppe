@@ -7,6 +7,10 @@ import type {
   EcommerceInfo,
   SupabaseMatch,
 } from "@/app/lib/search/elabora-scenari-types";
+import { trigramSimilarity } from "@/app/lib/search/trigram";
+
+/** Soglia: sotto di questa, il prezzo non può “battere” il match più vicino. */
+export const INLINE_TRIGRAM_PRICE_THRESHOLD = 0.8;
 
 export type InlineMatchCandidate = {
   id: string;
@@ -21,45 +25,82 @@ export type InlineMatchCandidate = {
   brand: string | null;
 };
 
+export type InlineMatchResult = {
+  matches: InlineMatchCandidate[];
+  selectedId: string | null;
+};
+
+type ScoredMatch = SupabaseMatch & { trigram: number };
+
+function toCandidate(
+  match: ScoredMatch,
+  ecommerceById: Map<string, EcommerceInfo>
+): InlineMatchCandidate {
+  const ecommerce = ecommerceById.get(match.ecommerce_id);
+  return {
+    id: match.id,
+    product_name: match.product_name,
+    prezzo: match.final_price,
+    similarity: match.trigram,
+    ecommerce_id: match.ecommerce_id,
+    ecommerce_name: ecommerce?.name ?? "E-commerce",
+    logo_url: ecommerce?.logo_url ?? null,
+    original_url: match.original_url ?? null,
+    discount: match.discount ?? null,
+    brand: match.brand ?? null,
+  };
+}
+
 /**
- * L'accetta Postgres ha già filtrato i candidati coerenti.
- * Qui: prezzo asc (highlighted = meno costoso), tie-break score desc.
+ * Classifica per vicinanza trigram (desc), tie-break prezzo asc.
+ * Scelta: tra sim ≥ T prendi il più economico; altrimenti il max sim.
  */
-export function rankInlineMatches(
+export function rankAndSelectInlineMatches(
+  query: string,
   matches: SupabaseMatch[],
-  catalog: EcommerceInfo[]
-): InlineMatchCandidate[] {
+  catalog: EcommerceInfo[],
+  threshold = INLINE_TRIGRAM_PRICE_THRESHOLD
+): InlineMatchResult {
   const ecommerceById = new Map(catalog.map((item) => [item.id, item]));
 
-  return matches
-    .slice()
-    .sort((a, b) => {
-      const priceDelta = a.final_price - b.final_price;
-      if (priceDelta !== 0) return priceDelta;
-      return b.similarity - a.similarity;
-    })
-    .map((match) => {
-      const ecommerce = ecommerceById.get(match.ecommerce_id);
-      return {
-        id: match.id,
-        product_name: match.product_name,
-        prezzo: match.final_price,
-        similarity: match.similarity,
-        ecommerce_id: match.ecommerce_id,
-        ecommerce_name: ecommerce?.name ?? "E-commerce",
-        logo_url: ecommerce?.logo_url ?? null,
-        original_url: match.original_url ?? null,
-        discount: match.discount ?? null,
-        brand: match.brand ?? null,
-      };
+  const scored: ScoredMatch[] = matches.map((match) => ({
+    ...match,
+    trigram: trigramSimilarity(query, match.product_name),
+  }));
+
+  scored.sort((a, b) => {
+    const simDelta = b.trigram - a.trigram;
+    if (simDelta !== 0) return simDelta;
+    return a.final_price - b.final_price;
+  });
+
+  if (scored.length === 0) {
+    return { matches: [], selectedId: null };
+  }
+
+  const eligible = scored.filter((m) => m.trigram >= threshold);
+  let selected: ScoredMatch;
+  if (eligible.length > 0) {
+    selected = eligible.reduce((best, cur) => {
+      if (cur.final_price < best.final_price) return cur;
+      if (cur.final_price > best.final_price) return best;
+      return cur.trigram > best.trigram ? cur : best;
     });
+  } else {
+    selected = scored[0];
+  }
+
+  return {
+    matches: scored.map((m) => toCandidate(m, ecommerceById)),
+    selectedId: selected.id,
+  };
 }
 
 export async function runInlineProductMatch(
   query: string
-): Promise<InlineMatchCandidate[]> {
+): Promise<InlineMatchResult> {
   const trimmed = query.trim();
-  if (!trimmed) return [];
+  if (!trimmed) return { matches: [], selectedId: null };
 
   const t0 = Date.now();
   console.log(`[inline-match] START query="${trimmed}"`);
@@ -80,17 +121,19 @@ export async function runInlineProductMatch(
     console.log(
       `[inline-match] END query="${trimmed}" empty total=${Date.now() - t0}ms`
     );
-    return [];
+    return { matches: [], selectedId: null };
   }
 
-  const rankedThin = rankInlineMatches(forQuery, catalog);
-  const cheapest = rankedThin[0];
+  const tRank = Date.now();
+  const thin = rankAndSelectInlineMatches(trimmed, forQuery, catalog);
+  const rankMs = Date.now() - tRank;
+  const thinSelected = thin.matches.find((m) => m.id === thin.selectedId);
   console.log(
-    `[inline-match] rank prezzo: first="${cheapest?.product_name}" €${cheapest?.prezzo}`
+    `[inline-match] trigram rank ${rankMs}ms → selected="${thinSelected?.product_name}" sim=${thinSelected?.similarity.toFixed(3)} €${thinSelected?.prezzo}`
   );
 
   const tEnrich = Date.now();
-  const enrichIds = new Set(rankedThin.map((c) => c.id));
+  const enrichIds = new Set(thin.matches.map((c) => c.id));
   const enriched = await enrichMatchesWithProductUrls(
     forQuery.filter((match) => enrichIds.has(match.id))
   );
@@ -99,10 +142,10 @@ export async function runInlineProductMatch(
     `[inline-match] enrich done in ${enrichMs}ms → ${enriched.length} righe`
   );
 
-  const ranked = rankInlineMatches(enriched, catalog);
+  const result = rankAndSelectInlineMatches(trimmed, enriched, catalog);
   console.log(
-    `[inline-match] END query="${trimmed}" matches=${ranked.length} total=${Date.now() - t0}ms (rpc=${rpcMs}ms enrich=${enrichMs}ms)`
+    `[inline-match] END query="${trimmed}" matches=${result.matches.length} total=${Date.now() - t0}ms (rpc=${rpcMs}ms rank=${rankMs}ms enrich=${enrichMs}ms)`
   );
 
-  return ranked;
+  return result;
 }

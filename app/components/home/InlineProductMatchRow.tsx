@@ -147,6 +147,9 @@ export function InlineProductMatchRow({
     const justExpanded = !wasExpandedRef.current;
     wasExpandedRef.current = true;
 
+    // Solo all'apertura: ricentrare a ogni click disorienta.
+    if (!justExpanded) return;
+
     const scrollToSelected = () => {
       const container = scrollRef.current;
       const card = selectedCardRef.current;
@@ -162,10 +165,9 @@ export function InlineProductMatchRow({
       container.scrollTo({ left: Math.max(0, nextLeft), behavior: "auto" });
     };
 
-    // After open animation; immediate when already expanded and selection changes.
-    const timeout = window.setTimeout(scrollToSelected, justExpanded ? 240 : 0);
+    const timeout = window.setTimeout(scrollToSelected, 240);
     return () => window.clearTimeout(timeout);
-  }, [expanded, canExpand, selected?.id]);
+  }, [expanded, canExpand]);
 
   return (
     <li className="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900/50">
@@ -177,6 +179,14 @@ export function InlineProductMatchRow({
           className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
           aria-expanded={canExpand ? expanded : undefined}
         >
+          {canExpand ? (
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform ${
+                expanded ? "rotate-180" : ""
+              }`}
+            />
+          ) : null}
+
           <span className="min-w-0 flex-1 truncate text-sm font-medium">
             {query}
           </span>
@@ -214,14 +224,6 @@ export function InlineProductMatchRow({
 
           {status === "error" ? (
             <span className="shrink-0 text-[10px] text-red-500">errore</span>
-          ) : null}
-
-          {canExpand ? (
-            <ChevronDown
-              className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform ${
-                expanded ? "rotate-180" : ""
-              }`}
-            />
           ) : null}
         </button>
 

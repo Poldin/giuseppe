@@ -36,6 +36,20 @@ function createRowId() {
   return `row-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function formatEuroTotal(value: number): string {
+  return `${new Intl.NumberFormat("it-IT", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value)} €`;
+}
+
+function selectedRowPrice(row: ProductRow): number | null {
+  if (row.status !== "ready" || row.matches.length === 0) return null;
+  const selected =
+    row.matches.find((match) => match.id === row.selectedId) ?? row.matches[0];
+  return selected?.prezzo ?? null;
+}
+
 export default function HomeSearchBox({
   recentProducts = [],
 }: {
@@ -117,6 +131,7 @@ export default function HomeSearchBox({
 
       const payload = (await response.json()) as {
         matches?: InlineMatchCandidate[];
+        selectedId?: string | null;
         error?: string;
       };
 
@@ -125,6 +140,10 @@ export default function HomeSearchBox({
       }
 
       const matches = Array.isArray(payload.matches) ? payload.matches : [];
+      const selectedId =
+        typeof payload.selectedId === "string"
+          ? payload.selectedId
+          : matches[0]?.id ?? null;
 
       setRows((current) =>
         current.map((row) => {
@@ -133,7 +152,7 @@ export default function HomeSearchBox({
             ...row,
             status: matches.length > 0 ? "ready" : "empty",
             matches,
-            selectedId: matches[0]?.id ?? null,
+            selectedId,
           };
         })
       );
@@ -285,6 +304,12 @@ export default function HomeSearchBox({
 
   const canSubmitList = rows.length > 0 && !isSubmitting;
 
+  const totalEuro = rows.reduce((sum, row) => {
+    const price = selectedRowPrice(row);
+    return price != null ? sum + price : sum;
+  }, 0);
+  const hasPricedRows = rows.some((row) => selectedRowPrice(row) != null);
+
   return (
     <div className="w-full max-w-lg text-left">
       <ProductSearchCombobox
@@ -316,14 +341,20 @@ export default function HomeSearchBox({
             Confronto in corso...
           </>
         ) : (
-          "Cerca e confronta prezzi"
+          "Confronta tutto"
         )}
       </button>
 
       <div className="mt-4">
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-            La tua ricerca ({rows.length})
+            {rows.length} {rows.length === 1 ? "prodotto" : "prodotti"}
+            {hasPricedRows ? (
+              <>
+                {" · "}
+                <span className="tabular-nums">{formatEuroTotal(totalEuro)}</span>
+              </>
+            ) : null}
           </p>
           {rows.length > 0 ? (
             <button
