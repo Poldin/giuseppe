@@ -3,6 +3,8 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+const FLASH_MS = 3000;
+
 export function RecentSearchesStrip({
   products,
   onSelectProduct,
@@ -13,8 +15,18 @@ export function RecentSearchesStrip({
   disabled?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const flashTimerRef = useRef<number | null>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [flashedProduct, setFlashedProduct] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (flashTimerRef.current != null) {
+        window.clearTimeout(flashTimerRef.current);
+      }
+    };
+  }, []);
 
   const updateScrollState = useCallback(() => {
     const element = scrollRef.current;
@@ -66,6 +78,18 @@ export function RecentSearchesStrip({
     });
   };
 
+  const handleSelect = (product: string) => {
+    onSelectProduct(product);
+    setFlashedProduct(product);
+    if (flashTimerRef.current != null) {
+      window.clearTimeout(flashTimerRef.current);
+    }
+    flashTimerRef.current = window.setTimeout(() => {
+      setFlashedProduct(null);
+      flashTimerRef.current = null;
+    }, FLASH_MS);
+  };
+
   if (products.length === 0) return null;
 
   const showScrollControls = canScrollLeft || canScrollRight;
@@ -105,19 +129,27 @@ export function RecentSearchesStrip({
         className="-mx-4 min-w-0 overflow-x-auto px-4 pb-1 scrollbar-none touch-pan-x sm:-mx-1 sm:px-1"
       >
         <div className="flex w-max gap-2">
-          {products.map((product) => (
-            <button
-              key={product}
-              type="button"
-              data-recent-search-chip
-              onClick={() => onSelectProduct(product)}
-              disabled={disabled}
-              aria-label={`Aggiungi ${product}`}
-              className="max-w-[14rem] shrink-0 truncate rounded-lg border border-zinc-200 bg-white px-3 py-2 text-left text-xs font-medium text-zinc-900 transition-colors hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-700 dark:hover:bg-zinc-800"
-            >
-              {product}
-            </button>
-          ))}
+          {products.map((product) => {
+            const isFlashed = flashedProduct === product;
+            return (
+              <button
+                key={product}
+                type="button"
+                data-recent-search-chip
+                onClick={() => handleSelect(product)}
+                disabled={disabled}
+                aria-pressed={isFlashed}
+                aria-label={`Aggiungi ${product}`}
+                className={`max-w-[14rem] shrink-0 truncate rounded-lg border px-3 py-2 text-left text-xs font-medium transition-[background-color,border-color,color,box-shadow] duration-300 disabled:cursor-not-allowed disabled:opacity-50 ${
+                  isFlashed
+                    ? "border-zinc-900 bg-zinc-900 text-white shadow-sm dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-950"
+                    : "border-zinc-200 bg-white text-zinc-900 hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-700 dark:hover:bg-zinc-800"
+                }`}
+              >
+                {product}
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>

@@ -116,7 +116,7 @@ export default async function Home() {
 
           <div className="flex flex-col gap-1">
             <p className="text-base leading-relaxed text-zinc-900 sm:text-lg">
-              <span className="box-decoration-clone bg-white px-1 py-0.5 dark:bg-white dark:text-zinc-900">
+              <span className="box-decoration-clone bg-zinc-900 px-1 py-0.5 text-white dark:bg-white dark:text-zinc-900">
                 confronto prezzi e prodotti{" "}
                 <span className="font-extrabold">su +100K articoli</span>{" "}
                 disponibili

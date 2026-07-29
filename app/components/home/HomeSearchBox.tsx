@@ -202,7 +202,7 @@ export default function HomeSearchBox({
       };
 
       // Keep ref in sync immediately so rapid successive adds see each other.
-      rowsRef.current = [...current, nextRow];
+      rowsRef.current = [nextRow, ...current];
       setRows(rowsRef.current);
       enqueueInlineMatch(rowId, trimmed);
 
