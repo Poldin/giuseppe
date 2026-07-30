@@ -108,6 +108,7 @@ export default async function Home({ searchParams }: PageProps) {
                   src="/giuseppe.jpeg"
                   alt="Giuseppe"
                   fill
+                  sizes="96px"
                   className="object-cover"
                   priority
                 />

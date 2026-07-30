@@ -18,6 +18,7 @@ export default function NotFound() {
               src="/giuseppe.jpeg"
               alt={SITE_NAME}
               fill
+              sizes="96px"
               className="object-cover"
               priority
             />

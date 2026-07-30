@@ -33,6 +33,7 @@ export function Footer() {
                 src="/giuseppe.jpeg"
                 alt={SITE_NAME}
                 fill
+                sizes="64px"
                 className="object-cover"
               />
             </div>

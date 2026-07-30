@@ -159,6 +159,7 @@ export default function AIBotWidget() {
                         src="/giuseppe.jpeg"
                         alt="AI Bot Giuseppe"
                         fill
+                        sizes="56px"
                         className="object-cover rounded-full"
                         priority
                     />
@@ -185,7 +186,7 @@ export default function AIBotWidget() {
                             <div className="flex items-center justify-between mb-1">
                                 <div className="flex items-center gap-2">
                                     <div className="relative w-10 h-10 rounded-full overflow-hidden shrink-0">
-                                        <Image src="/giuseppe.jpeg" alt="Giuseppe" fill className="object-cover rounded-full" />
+                                        <Image src="/giuseppe.jpeg" alt="Giuseppe" fill sizes="40px" className="object-cover rounded-full" />
                                     </div>
                                     <div>
                                         <h1 className="font-bold text-2xl leading-none">Giuseppe</h1>
