@@ -43,6 +43,16 @@ export function formatExportPrice(value: number): string {
   }).format(value);
 }
 
+/** Es. `30/07/2026 alle 17:30` */
+export function formatExportDateTime(date: Date = new Date()): string {
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yyyy = String(date.getFullYear());
+  const hh = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${dd}/${mm}/${yyyy} alle ${hh}:${min}`;
+}
+
 /** Es. `4_ricerche_eur_35_99_16-07-2026.pdf` */
 export function buildScenarioExportFilename(
   document: ScenarioExportDocument,
@@ -81,6 +91,71 @@ export function formatExportSummary(
 
 export function buildMatchShareText(scenario: ScenarioCarrello): string {
   return `${scenario.titolo} -> totale ${formatExportPrice(scenario.prezzo_totale)}`;
+}
+
+/** Export document from home cart groups (already priced with shipping). */
+export function buildCartExportDocument(
+  groups: Array<{
+    ecommerceId: string;
+    ecommerceName: string;
+    subtotal: number;
+    shipping: number;
+    total: number;
+    lines: Array<{
+      productName: string;
+      brand: string | null;
+      quantity: number;
+      unitPrice: number;
+      lineTotal: number;
+      query: string;
+      originalUrl?: string | null;
+    }>;
+  }>,
+  pageUrl?: string
+): ScenarioExportDocument {
+  const allLines = groups.flatMap((group) => group.lines);
+  const requestedProducts = Array.from(
+    new Set(
+      allLines
+        .map((line) => line.query.trim())
+        .filter((query) => query.length > 0)
+    )
+  );
+
+  const productsPrice = groups.reduce((sum, group) => sum + group.subtotal, 0);
+  const shippingPrice = groups.reduce((sum, group) => sum + group.shipping, 0);
+  const totalPrice = groups.reduce((sum, group) => sum + group.total, 0);
+  const itemCount = allLines.length;
+  const coverageTotal =
+    requestedProducts.length > 0 ? requestedProducts.length : itemCount;
+
+  return {
+    title: "Carrello",
+    coverage: itemCount,
+    coverageTotal,
+    productsPrice,
+    shippingPrice,
+    totalPrice,
+    requestedProducts,
+    shops: groups.map((group) => ({
+      ecommerceId: group.ecommerceId,
+      ecommerceName: group.ecommerceName,
+      itemCount: group.lines.length,
+      coverageTotal,
+      productsPrice: group.subtotal,
+      shippingPrice: group.shipping,
+      totalPrice: group.total,
+      items: group.lines.map((line) => ({
+        productName: line.productName,
+        brand: line.brand?.trim() || null,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        linePrice: line.lineTotal,
+        url: line.originalUrl?.trim() || null,
+      })),
+    })),
+    pageUrl,
+  };
 }
 
 export function buildScenarioExportDocument(
@@ -192,6 +267,52 @@ export function exportDocumentToText(document: ScenarioExportDocument): string {
     ""
   );
 
+  appendExportShopsToText(lines, document);
+
+  if (document.pageUrl) {
+    lines.push(`Trovi tutto al link: ${document.pageUrl}`);
+  }
+
+  lines.push("");
+  lines.push("❤️‍🔥 Giuseppe");
+
+  return lines.join("\n").trim();
+}
+
+/** Testo carrello home: intestazione breve, senza richiesta/risposta/firma. */
+export function exportCartDocumentToText(
+  document: ScenarioExportDocument,
+  date: Date = new Date()
+): string {
+  const lines: string[] = [
+    "Giuseppe acquisti - confronto prezzi e prodotti su +100K articoli odontoiatrici",
+    "",
+    `totale carrello: ${formatExportPrice(document.totalPrice)}`,
+    formatExportSummary(
+      document.coverage,
+      document.coverageTotal,
+      document.productsPrice,
+      document.shippingPrice
+    ),
+    "",
+  ];
+
+  appendExportShopsToText(lines, document);
+
+  if (document.pageUrl) {
+    lines.push(`Trovi tutto al link: ${document.pageUrl}`);
+  }
+
+  lines.push("");
+  lines.push(`Generato il ${formatExportDateTime(date)}`);
+
+  return lines.join("\n").trim();
+}
+
+function appendExportShopsToText(
+  lines: string[],
+  document: ScenarioExportDocument
+) {
   for (const shop of document.shops) {
     lines.push(
       `👉 ${shop.ecommerceName} — ${formatExportPrice(shop.totalPrice)}`
@@ -216,15 +337,6 @@ export function exportDocumentToText(document: ScenarioExportDocument): string {
 
     lines.push("");
   }
-
-  if (document.pageUrl) {
-    lines.push(`Trovi tutto al link: ${document.pageUrl}`);
-  }
-
-  lines.push("");
-  lines.push("❤️‍🔥 Giuseppe");
-
-  return lines.join("\n").trim();
 }
 
 export function buildScenarioInfoText(

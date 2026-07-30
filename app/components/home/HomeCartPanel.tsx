@@ -2,6 +2,7 @@
 
 import { EcommerceLogoBadge } from "@/app/components/chat/EcommerceLogoBadge";
 import { QuantityControl } from "@/app/components/chat/QuantityControl";
+import { HomeCartExportActions } from "@/app/components/home/HomeCartExportActions";
 import { HomeShareButton } from "@/app/components/home/HomeShareButton";
 import {
   buildShippingHints,
@@ -23,6 +24,7 @@ export type HomeCartLine = {
   ecommerceId: string;
   ecommerceName: string;
   logoUrl: string | null;
+  originalUrl: string | null;
   quantity: number;
   unitPrice: number;
   lineTotal: number;
@@ -212,6 +214,7 @@ function CartBody({
 
       <div className="mt-5 border-t border-zinc-100 pt-4 dark:border-zinc-900">
         <HomeShareButton className="w-full justify-center" />
+        <HomeCartExportActions groupsWithShipping={groupsWithShipping} />
       </div>
     </div>
   );

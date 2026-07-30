@@ -82,6 +82,7 @@ function cartLineFromMatch(
     ecommerceId: match.ecommerce_id,
     ecommerceName: match.ecommerce_name,
     logoUrl: match.logo_url,
+    originalUrl: match.original_url,
     quantity: qty,
     unitPrice: match.prezzo,
     lineTotal: match.prezzo * qty,

@@ -5,6 +5,7 @@ import PDFDocument from "pdfkit";
 
 import {
   buildScenarioExportFilename,
+  formatExportDateTime,
   formatExportPrice,
   formatExportSummary,
   stripExportEmojis,
@@ -73,8 +74,16 @@ function drawTableHeader(
 }
 
 export function exportDocumentToPdf(
-  document: ScenarioExportDocument
+  document: ScenarioExportDocument,
+  options?: {
+    /** Carrello home: niente Richiesta/Risposta, footer “Generato il …”. */
+    variant?: "scenario" | "cart";
+    generatedAt?: Date;
+  }
 ): Promise<Buffer> {
+  const variant = options?.variant ?? "scenario";
+  const generatedAt = options?.generatedAt ?? new Date();
+
   return new Promise((resolve, reject) => {
     const pdf = new PDFDocument({
       size: "A4",
@@ -143,7 +152,7 @@ export function exportDocumentToPdf(
       (headerImagePath ? HEADER_IMAGE_SIZE : 36) +
       HEADER_BOTTOM_GAP;
 
-    if (document.requestedProducts.length > 0) {
+    if (variant === "scenario" && document.requestedProducts.length > 0) {
       drawSectionTitle(pdf, "Richiesta");
       pdf.font("Helvetica").fontSize(10).fillColor("#3f3f46");
       for (const prodotto of document.requestedProducts) {
@@ -153,9 +162,15 @@ export function exportDocumentToPdf(
       pdf.moveDown(1);
     }
 
-    drawSectionTitle(pdf, "Risposta");
+    if (variant === "scenario") {
+      drawSectionTitle(pdf, "Risposta");
+    }
+
     {
-      const title = stripExportEmojis(document.title);
+      const title =
+        variant === "cart"
+          ? "Carrello"
+          : stripExportEmojis(document.title);
       const totalLabel = formatExportPrice(document.totalPrice);
       const titleStartY = pdf.y;
       pdf
@@ -346,6 +361,18 @@ export function exportDocumentToPdf(
           link: document.pageUrl,
           underline: true,
           align: "left",
+        });
+    }
+
+    if (variant === "cart") {
+      ensureSpace(pdf, 24);
+      pdf.moveDown(1.2);
+      pdf
+        .font("Helvetica")
+        .fontSize(8)
+        .fillColor("#71717a")
+        .text(`Generato il ${formatExportDateTime(generatedAt)}`, {
+          width: contentWidth,
         });
     }
 
