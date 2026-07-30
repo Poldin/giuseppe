@@ -11,6 +11,7 @@ import { useState } from "react";
 /** Path hub SEO — letterali per evitare di trascinare lib server/Supabase nel client. */
 const HUB_LINKS = [
   { href: "/pub", label: "Prodotti" },
+  { href: "/categorie", label: "Categorie" },
   { href: "/vs", label: "Confronti prezzi" },
   { href: "/recall", label: "Avvisi di sicurezza" },
   { href: "/medical_device", label: "Dispositivi medici" },

@@ -43,8 +43,10 @@ import {
 import { docsPath } from "@/app/lib/seo/docs";
 import { medicalDeviceHubPath, medicalDevicePath } from "@/app/lib/seo/medical-device";
 import { getNotazioneDentaleSitemapEntries } from "@/app/lib/seo/notazione-dentale";
+import { fetchTypeLanderSlugs } from "@/app/lib/category/type-lander";
 import { pubHubPath } from "@/app/lib/seo/pub-product";
 import { recallHubPath, recallPath } from "@/app/lib/seo/recall";
+import { typeLanderHubPath, typeLanderPath } from "@/app/lib/seo/type-lander";
 import { vsCombinationPath, vsHubPath } from "@/app/lib/seo/vs-combination";
 import { SITE_URL } from "@/app/lib/seo/site";
 import type { MetadataRoute } from "next";
@@ -115,6 +117,7 @@ export default async function sitemap(props: {
     });
     for (const hub of [
       { path: pubHubPath(), priority: 0.8 },
+      { path: typeLanderHubPath(), priority: 0.8 },
       { path: vsHubPath(), priority: 0.8 },
       { path: recallHubPath(), priority: 0.7 },
       { path: medicalDeviceHubPath(), priority: 0.7 },
@@ -133,6 +136,20 @@ export default async function sitemap(props: {
         changeFrequency: entry.changeFrequency,
         priority: entry.priority,
       });
+    }
+
+    try {
+      const typeLanderSlugs = await fetchTypeLanderSlugs();
+      for (const slug of typeLanderSlugs) {
+        entries.push({
+          url: `${SITE_URL}${typeLanderPath(slug)}`,
+          lastModified: new Date(),
+          changeFrequency: "daily",
+          priority: 0.75,
+        });
+      }
+    } catch (error) {
+      console.error("[sitemap] type landers failed:", error);
     }
   }
 

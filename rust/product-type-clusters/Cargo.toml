@@ -1,0 +1,22 @@
+[package]
+name = "product-type-clusters"
+version = "0.1.0"
+edition = "2021"
+description = "Step-1 mechanical type clustering on scraped product names (offline CLI)"
+license = "MIT"
+
+[[bin]]
+name = "product-type-clusters"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rayon = "1"
+regex = "1"
+rustc-hash = "2"
+
+[profile.release]
+lto = true
+opt-level = 3
+codegen-units = 1

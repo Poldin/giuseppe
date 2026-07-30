@@ -151,6 +151,40 @@ CREATE TABLE public.scraped_product (
   CONSTRAINT scraped_product_pkey PRIMARY KEY (id),
   CONSTRAINT scraped_product_ecommerce_id_fkey FOREIGN KEY (ecommerce_id) REFERENCES public.ecommerce_brand(id)
 );
+CREATE TABLE public.product_type_category (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  run_key text NOT NULL,
+  source_cluster_id integer NOT NULL,
+  slug text NOT NULL UNIQUE,
+  mechanical_label text NOT NULL,
+  seo_title text,
+  kind text,
+  seo_action text,
+  cohesion numeric,
+  size_at_run integer,
+  is_brand_bucket boolean NOT NULL DEFAULT false,
+  is_active boolean NOT NULL DEFAULT true,
+  other jsonb NOT NULL DEFAULT '{}'::jsonb,
+  -- Lander SEO (`/categorie/[lander_slug]`): hub kind type|type_or_line|brand_line (n≥25, coh≥0.25).
+  lander_slug text,
+  CONSTRAINT product_type_category_pkey PRIMARY KEY (id),
+  CONSTRAINT product_type_category_run_cluster_uq UNIQUE (run_key, source_cluster_id)
+);
+-- Pubblicabili: seo_action='hub' AND kind IN ('type','type_or_line','brand_line') AND lander_slug IS NOT NULL
+-- RPC: type_lander_by_slug(text), type_lander_slugs()
+CREATE TABLE public.link_scraped_product_type_category (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  scraped_product_id uuid NOT NULL,
+  category_id uuid NOT NULL,
+  run_key text NOT NULL,
+  CONSTRAINT link_scraped_product_type_category_pkey PRIMARY KEY (id),
+  CONSTRAINT link_sptc_scraped_fkey FOREIGN KEY (scraped_product_id) REFERENCES public.scraped_product(id),
+  CONSTRAINT link_sptc_category_fkey FOREIGN KEY (category_id) REFERENCES public.product_type_category(id),
+  CONSTRAINT link_sptc_product_category_uq UNIQUE (scraped_product_id, category_id)
+);
 CREATE TABLE public.review_giuseppe (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   created_at timestamp with time zone NOT NULL DEFAULT now(),
