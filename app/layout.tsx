@@ -9,6 +9,7 @@ import {
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -91,6 +92,12 @@ export default function RootLayout({
         <div className="flex min-h-full flex-1 flex-col">{children}</div>
         <Footer />
         <Analytics />
+        <Script
+          defer
+          src="https://cloud.umami.is/script.js"
+          data-website-id="eebd767a-56cf-43f2-b87d-534a063c563e"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
