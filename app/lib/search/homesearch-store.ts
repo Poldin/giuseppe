@@ -11,6 +11,21 @@ export type HomesearchQueryOther = {
   removed_at?: string | null;
 };
 
+/** Minimal cart line stored on the session — product details come from query results. */
+export type HomesearchCartLineRef = {
+  rowId: string;
+  matchId: string;
+  quantity: number;
+};
+
+export type HomesearchSessionOther = {
+  /**
+   * Cart snapshot for share/reload.
+   * `undefined` = legacy session (cart not persisted yet) → UI falls back to selected matches.
+   */
+  cart?: HomesearchCartLineRef[];
+};
+
 export type HomesearchQueryRow = {
   id: string;
   created_at: string;
@@ -23,6 +38,7 @@ export type HomesearchQueryRow = {
 export type HomesearchSessionSnapshot = {
   id: string;
   created_at: string;
+  other: HomesearchSessionOther;
   queries: HomesearchQueryRow[];
 };
 
@@ -81,6 +97,33 @@ function parseOther(value: unknown): HomesearchQueryOther {
   };
 }
 
+function parseCartRefs(value: unknown): HomesearchCartLineRef[] {
+  if (!Array.isArray(value)) return [];
+  const lines: HomesearchCartLineRef[] = [];
+  for (const item of value) {
+    if (typeof item !== "object" || item === null) continue;
+    const row = item as Record<string, unknown>;
+    if (typeof row.rowId !== "string" || typeof row.matchId !== "string") continue;
+    const qty =
+      typeof row.quantity === "number" && Number.isFinite(row.quantity)
+        ? Math.max(1, Math.floor(row.quantity))
+        : 1;
+    lines.push({ rowId: row.rowId, matchId: row.matchId, quantity: qty });
+  }
+  return lines;
+}
+
+export function parseSessionOther(value: unknown): HomesearchSessionOther {
+  if (typeof value !== "object" || value === null) {
+    return {};
+  }
+  const row = value as Record<string, unknown>;
+  if (!("cart" in row)) {
+    return {};
+  }
+  return { cart: parseCartRefs(row.cart) };
+}
+
 function mapQueryRow(data: {
   id: string;
   created_at: string;
@@ -103,7 +146,7 @@ function mapQueryRow(data: {
 export async function createHomesearchSession(): Promise<string> {
   const { data, error } = await supabase
     .from("homesearch_session")
-    .insert({ other: {} })
+    .insert({ other: { cart: [] } satisfies HomesearchSessionOther })
     .select("id")
     .single();
 
@@ -112,6 +155,39 @@ export async function createHomesearchSession(): Promise<string> {
   }
 
   return data.id;
+}
+
+export async function updateHomesearchSessionOther(
+  sessionId: string,
+  patch: Partial<HomesearchSessionOther>
+): Promise<void> {
+  const { data: existing, error: readError } = await supabase
+    .from("homesearch_session")
+    .select("other")
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  if (readError) {
+    throw new Error(readError.message);
+  }
+  if (!existing) {
+    throw new Error("Sessione non trovata");
+  }
+
+  const current = parseSessionOther(existing.other);
+  const next: HomesearchSessionOther = {
+    ...current,
+    ...patch,
+  };
+
+  const { error } = await supabase
+    .from("homesearch_session")
+    .update({ other: next })
+    .eq("id", sessionId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 export async function createHomesearchQuery(input: {
@@ -214,8 +290,9 @@ export async function softDeleteSessionQueries(sessionId: string): Promise<void>
     return !other.removed_at;
   });
 
-  await Promise.all(
-    active.map(async (row) => {
+  await Promise.all([
+    updateHomesearchSessionOther(sessionId, { cart: [] }),
+    ...active.map(async (row) => {
       const other = parseOther(row.other);
       const { error: updateError } = await supabase
         .from("homesearch_query")
@@ -224,8 +301,8 @@ export async function softDeleteSessionQueries(sessionId: string): Promise<void>
       if (updateError) {
         throw new Error(updateError.message);
       }
-    })
-  );
+    }),
+  ]);
 }
 
 export async function getHomesearchSession(
@@ -233,13 +310,15 @@ export async function getHomesearchSession(
 ): Promise<HomesearchSessionSnapshot | null> {
   const { data: session, error: sessionError } = await supabase
     .from("homesearch_session")
-    .select("id, created_at")
+    .select("id, created_at, other")
     .eq("id", sessionId)
     .maybeSingle();
 
   if (sessionError || !session) {
     return null;
   }
+
+  const sessionOther = parseSessionOther(session.other);
 
   const { data: queries, error: queriesError } = await supabase
     .from("homesearch_query")
@@ -249,7 +328,12 @@ export async function getHomesearchSession(
 
   if (queriesError) {
     console.error("getHomesearchSession queries failed:", queriesError);
-    return { id: session.id, created_at: session.created_at, queries: [] };
+    return {
+      id: session.id,
+      created_at: session.created_at,
+      other: sessionOther,
+      queries: [],
+    };
   }
 
   const mapped = (queries ?? [])
@@ -260,6 +344,7 @@ export async function getHomesearchSession(
   return {
     id: session.id,
     created_at: session.created_at,
+    other: sessionOther,
     queries: mapped,
   };
 }

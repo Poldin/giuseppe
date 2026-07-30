@@ -1,8 +1,11 @@
 "use client";
 
-import { Loader2, Share2 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { Share2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  HomeCartPanel,
+  type HomeCartLine,
+} from "@/app/components/home/HomeCartPanel";
 import {
   InlineProductMatchRow,
   type InlineProductRowStatus,
@@ -11,9 +14,12 @@ import { ProductSearchCombobox } from "@/app/components/home/ProductSearchCombob
 import { RecentSearchesStrip } from "@/app/components/home/RecentSearchesStrip";
 import type { InlineMatchCandidate } from "@/app/lib/search/inline-match";
 import type {
+  HomesearchCartLineRef,
   HomesearchQueryRow,
   HomesearchSessionSnapshot,
 } from "@/app/lib/search/homesearch-store";
+import type { EcommerceInfo } from "@/app/lib/search/elabora-scenari-types";
+import { buildShippingTiersMap } from "@/app/lib/search/shipping-cost";
 
 const MAX_PRODUCTS = 20;
 /** One inline-match at a time; queued rows still show the loading UI. */
@@ -57,6 +63,73 @@ function selectedRowLineTotal(row: ProductRow): number | null {
   if (!selected) return null;
   const quantity = Math.max(1, row.quantities[selected.id] ?? 1);
   return selected.prezzo * quantity;
+}
+
+function cartLineFromMatch(
+  rowId: string,
+  query: string,
+  match: InlineMatchCandidate,
+  quantity = 1
+): HomeCartLine {
+  const qty = Math.max(1, quantity);
+  return {
+    id: `${rowId}:${match.id}`,
+    rowId,
+    matchId: match.id,
+    query,
+    productName: match.product_name,
+    brand: match.brand,
+    ecommerceId: match.ecommerce_id,
+    ecommerceName: match.ecommerce_name,
+    logoUrl: match.logo_url,
+    quantity: qty,
+    unitPrice: match.prezzo,
+    lineTotal: match.prezzo * qty,
+  };
+}
+
+/** Snapshot iniziale carrello da session — poi resta indipendente dalla selezione centrale. */
+function buildInitialCartLines(rows: ProductRow[]): HomeCartLine[] {
+  const lines: HomeCartLine[] = [];
+  for (const row of rows) {
+    if (row.status !== "ready" || row.matches.length === 0) continue;
+    const selected =
+      row.matches.find((match) => match.id === row.selectedId) ?? row.matches[0];
+    if (!selected) continue;
+    const quantity = Math.max(1, row.quantities[selected.id] ?? 1);
+    lines.push(cartLineFromMatch(row.id, row.query, selected, quantity));
+  }
+  return lines;
+}
+
+/** Restore cart from session.other.cart; legacy sessions without cart fall back to selected matches. */
+function resolveCartLines(
+  rows: ProductRow[],
+  cartRefs: HomesearchCartLineRef[] | undefined
+): HomeCartLine[] {
+  if (cartRefs === undefined) {
+    return buildInitialCartLines(rows);
+  }
+
+  const lines: HomeCartLine[] = [];
+  for (const ref of cartRefs) {
+    const row = rows.find((item) => item.id === ref.rowId);
+    if (!row || row.status !== "ready") continue;
+    const match = row.matches.find((item) => item.id === ref.matchId);
+    if (!match) continue;
+    lines.push(
+      cartLineFromMatch(row.id, row.query, match, ref.quantity)
+    );
+  }
+  return lines;
+}
+
+function cartLinesToRefs(lines: HomeCartLine[]): HomesearchCartLineRef[] {
+  return lines.map((line) => ({
+    rowId: line.rowId,
+    matchId: line.matchId,
+    quantity: line.quantity,
+  }));
 }
 
 function buildQuantities(
@@ -118,20 +191,26 @@ async function persistQueryUpdate(
 export default function HomeSearchBox({
   recentProducts = [],
   initialSession = null,
+  ecommerces = [],
 }: {
   recentProducts?: string[];
   initialSession?: HomesearchSessionSnapshot | null;
+  ecommerces?: EcommerceInfo[];
 }) {
-  const router = useRouter();
+  const tiersByEcommerce = buildShippingTiersMap(ecommerces);
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<ProductRow[]>(() =>
     initialSession ? initialSession.queries.map(queryRowToProductRow) : []
   );
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [cartLines, setCartLines] = useState<HomeCartLine[]>(() => {
+    if (!initialSession) return [];
+    const productRows = initialSession.queries.map(queryRowToProductRow);
+    return resolveCartLines(productRows, initialSession.other.cart);
+  });
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
 
   const rowsRef = useRef<ProductRow[]>(rows);
+  const cartLinesRef = useRef<HomeCartLine[]>(cartLines);
   const sessionIdRef = useRef<string | null>(initialSession?.id ?? null);
   const sessionCreatePromiseRef = useRef<Promise<string> | null>(null);
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
@@ -141,16 +220,59 @@ export default function HomeSearchBox({
     async () => undefined
   );
   const persistTimersRef = useRef<Map<string, number>>(new Map());
+  const cartPersistTimerRef = useRef<number | null>(null);
+  /** Skip hydrate write only when cart was already stored on the session. */
+  const skipNextCartPersistRef = useRef(
+    Boolean(initialSession && initialSession.other.cart !== undefined)
+  );
 
   useEffect(() => {
     rowsRef.current = rows;
   }, [rows]);
 
   useEffect(() => {
+    cartLinesRef.current = cartLines;
+  }, [cartLines]);
+
+  useEffect(() => {
     if (initialSession?.id) {
       setSrcInUrl(initialSession.id);
     }
   }, [initialSession?.id]);
+
+  const persistCartNow = useCallback(async (lines: HomeCartLine[]) => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId) return;
+    try {
+      await fetch(`/api/homesearch/session/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cart: cartLinesToRefs(lines) }),
+      });
+    } catch (persistError) {
+      console.error("homesearch cart persist failed:", persistError);
+    }
+  }, []);
+
+  const schedulePersistCart = useCallback(() => {
+    if (skipNextCartPersistRef.current) {
+      skipNextCartPersistRef.current = false;
+      return;
+    }
+    if (!sessionIdRef.current) return;
+
+    if (cartPersistTimerRef.current != null) {
+      window.clearTimeout(cartPersistTimerRef.current);
+    }
+    cartPersistTimerRef.current = window.setTimeout(() => {
+      cartPersistTimerRef.current = null;
+      void persistCartNow(cartLinesRef.current);
+    }, 300);
+  }, [persistCartNow]);
+
+  useEffect(() => {
+    schedulePersistCart();
+  }, [cartLines, schedulePersistCart]);
 
   useEffect(() => {
     return () => {
@@ -164,11 +286,24 @@ export default function HomeSearchBox({
         window.clearTimeout(timer);
       }
       persistTimersRef.current.clear();
+      if (cartPersistTimerRef.current != null) {
+        window.clearTimeout(cartPersistTimerRef.current);
+      }
     };
   }, []);
 
   const ensureSession = useCallback(async (): Promise<string> => {
     if (sessionIdRef.current) return sessionIdRef.current;
+
+    const fromUrl =
+      typeof window !== "undefined"
+        ? new URL(window.location.href).searchParams.get(SRC_PARAM)
+        : null;
+    if (fromUrl) {
+      sessionIdRef.current = fromUrl;
+      return fromUrl;
+    }
+
     if (sessionCreatePromiseRef.current) return sessionCreatePromiseRef.current;
 
     sessionCreatePromiseRef.current = (async () => {
@@ -182,6 +317,10 @@ export default function HomeSearchBox({
       }
       sessionIdRef.current = payload.sessionId;
       setSrcInUrl(payload.sessionId);
+      // Cart may have been filled before the session existed — flush now.
+      if (cartLinesRef.current.length > 0) {
+        void persistCartNow(cartLinesRef.current);
+      }
       return payload.sessionId;
     })();
 
@@ -190,7 +329,7 @@ export default function HomeSearchBox({
     } finally {
       sessionCreatePromiseRef.current = null;
     }
-  }, []);
+  }, [persistCartNow]);
 
   const persistRowNow = useCallback((row: ProductRow) => {
     if (!row.dbQueryId) return;
@@ -332,6 +471,8 @@ export default function HomeSearchBox({
               matches,
               selectedId,
               quantities: buildQuantities(matches, row.quantities),
+              // A fine confronto apri subito la riga se ci sono risultati
+              expanded: matches.length > 0,
             };
             return updatedRow;
           });
@@ -340,6 +481,27 @@ export default function HomeSearchBox({
         });
 
         if (updatedRow) persistRowNow(updatedRow);
+
+        // Nuovo confronto: inserisci in carrello il match scelto dal sistema
+        if (matches.length > 0) {
+          const selected =
+            matches.find((match) => match.id === selectedId) ?? matches[0];
+          if (selected) {
+            setCartLines((current) => {
+              if (
+                current.some(
+                  (line) => line.rowId === rowId && line.matchId === selected.id
+                )
+              ) {
+                return current;
+              }
+              return [
+                cartLineFromMatch(rowId, productName, selected, 1),
+                ...current,
+              ];
+            });
+          }
+        }
       } catch (fetchError) {
         if (controller.signal.aborted) return;
 
@@ -398,7 +560,6 @@ export default function HomeSearchBox({
       );
       if (exists || current.length >= MAX_PRODUCTS) {
         setQuery("");
-        setError(null);
         return;
       }
 
@@ -421,7 +582,6 @@ export default function HomeSearchBox({
       enqueueInlineMatch(rowId, trimmed);
 
       setQuery("");
-      setError(null);
     },
     [createDbQuery, enqueueInlineMatch]
   );
@@ -442,6 +602,7 @@ export default function HomeSearchBox({
       const removed = rowsRef.current.find((row) => row.id === rowId);
       rowsRef.current = rowsRef.current.filter((row) => row.id !== rowId);
       setRows(rowsRef.current);
+      setCartLines((current) => current.filter((line) => line.rowId !== rowId));
       pumpMatchQueue();
 
       if (removed?.dbQueryId) {
@@ -468,7 +629,7 @@ export default function HomeSearchBox({
     const sessionId = sessionIdRef.current;
     rowsRef.current = [];
     setRows([]);
-    setError(null);
+    setCartLines([]);
     sessionIdRef.current = null;
     sessionCreatePromiseRef.current = null;
     setSrcInUrl(null);
@@ -487,6 +648,44 @@ export default function HomeSearchBox({
       );
       rowsRef.current = next;
       return next;
+    });
+  }, []);
+
+  const changeCartQuantity = useCallback((lineId: string, nextQty: number) => {
+    const quantity = Math.max(1, Math.floor(nextQty) || 1);
+    setCartLines((current) =>
+      current.map((line) =>
+        line.id === lineId
+          ? {
+              ...line,
+              quantity,
+              lineTotal: line.unitPrice * quantity,
+            }
+          : line
+      )
+    );
+  }, []);
+
+  const removeFromCart = useCallback((lineId: string) => {
+    setCartLines((current) => current.filter((line) => line.id !== lineId));
+  }, []);
+
+  const addToCart = useCallback((rowId: string, matchId: string) => {
+    const row = rowsRef.current.find((item) => item.id === rowId);
+    if (!row) return;
+    const match = row.matches.find((item) => item.id === matchId);
+    if (!match) return;
+
+    setCartLines((current) => {
+      if (
+        current.some(
+          (line) => line.rowId === rowId && line.matchId === matchId
+        )
+      ) {
+        return current;
+      }
+      const quantity = Math.max(1, row.quantities[matchId] ?? 1);
+      return [cartLineFromMatch(rowId, row.query, match, quantity), ...current];
     });
   }, []);
 
@@ -522,6 +721,32 @@ export default function HomeSearchBox({
       schedulePersistRow(rowId);
     },
     [schedulePersistRow]
+  );
+
+  const retryMatch = useCallback(
+    (rowId: string) => {
+      const row = rowsRef.current.find((item) => item.id === rowId);
+      if (!row) return;
+
+      setRows((current) => {
+        const next = current.map((item) =>
+          item.id === rowId
+            ? {
+                ...item,
+                status: "loading" as const,
+                matches: [],
+                selectedId: null,
+                quantities: {},
+                expanded: false,
+              }
+            : item
+        );
+        rowsRef.current = next;
+        return next;
+      });
+      enqueueInlineMatch(rowId, row.query);
+    },
+    [enqueueInlineMatch]
   );
 
   const handleShare = useCallback(async () => {
@@ -562,52 +787,6 @@ export default function HomeSearchBox({
     }
   }, [ensureSession]);
 
-  const handleSubmitList = async () => {
-    if (rows.length === 0 || isSubmitting) return;
-
-    setIsSubmitting(true);
-    setError(null);
-
-    const products = rows.map((row) => row.query);
-
-    try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          products,
-          queryText: products.join(", "),
-        }),
-      });
-
-      const payload = (await response.json()) as {
-        chatId?: string;
-        error?: string;
-      };
-
-      if (!response.ok || !payload.chatId) {
-        throw new Error(payload.error ?? "Errore durante l'invio");
-      }
-
-      try {
-        sessionStorage.setItem("giuseppe:showRicercaCompletata", "1");
-      } catch {
-        // ignore storage errors (private mode, etc.)
-      }
-
-      router.push(`/chat/${payload.chatId}`);
-    } catch (submitError) {
-      setError(
-        submitError instanceof Error
-          ? submitError.message
-          : "Errore durante l'invio"
-      );
-      setIsSubmitting(false);
-    }
-  };
-
-  const canSubmitList = rows.length > 0 && !isSubmitting;
-
   const totalEuro = rows.reduce((sum, row) => {
     const line = selectedRowLineTotal(row);
     return line != null ? sum + line : sum;
@@ -616,6 +795,13 @@ export default function HomeSearchBox({
 
   return (
     <div className="w-full max-w-lg text-left">
+      <HomeCartPanel
+        lines={cartLines}
+        tiersByEcommerce={tiersByEcommerce}
+        onQuantityChange={changeCartQuantity}
+        onRemove={removeFromCart}
+      />
+
       <ProductSearchCombobox
         value={query}
         onChange={setQuery}
@@ -623,31 +809,13 @@ export default function HomeSearchBox({
         onAddFromInput={() => {
           if (query.trim()) addProduct(query);
         }}
-        disabled={isSubmitting}
         placeholder="Cerca un prodotto..."
       />
 
       <RecentSearchesStrip
         products={recentProducts}
         onSelectProduct={addProduct}
-        disabled={isSubmitting}
       />
-
-      <button
-        type="button"
-        onClick={() => void handleSubmitList()}
-        disabled={!canSubmitList}
-        className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-zinc-900 px-5 py-3 text-sm font-semibold text-white transition-all hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-500 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200 dark:disabled:bg-zinc-700 dark:disabled:text-zinc-500"
-      >
-        {isSubmitting ? (
-          <>
-            <Loader2 size={16} className="animate-spin" />
-            Confronto in corso...
-          </>
-        ) : (
-          "Confronta tutto"
-        )}
-      </button>
 
       <div className="mt-4">
         <div className="flex items-center justify-between gap-2">
@@ -665,8 +833,7 @@ export default function HomeSearchBox({
               <button
                 type="button"
                 onClick={() => void handleShare()}
-                disabled={isSubmitting}
-                className="inline-flex items-center gap-1 text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-zinc-200"
+                className="inline-flex items-center gap-1 text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-800 dark:hover:text-zinc-200"
               >
                 <Share2 size={12} aria-hidden />
                 {shareFeedback ?? "Condividi"}
@@ -674,22 +841,25 @@ export default function HomeSearchBox({
               <button
                 type="button"
                 onClick={clearAllProducts}
-                disabled={isSubmitting}
-                className="text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-zinc-200"
+                className="text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-800 dark:hover:text-zinc-200"
               >
                 Elimina tutto
               </button>
             </div>
           ) : null}
         </div>
-        {!canSubmitList && !isSubmitting ? (
+        {rows.length === 0 ? (
           <p className="mt-5 text-xs text-center text-zinc-500">
             puoi aggiungere fino a{" "}
             <span className="font-extrabold">20 prodotti</span> per ricerca
           </p>
         ) : null}
         <ul className="mt-2 flex min-h-[8.125rem] flex-col gap-2">
-          {rows.map((row) => (
+          {rows.map((row) => {
+            const cartMatchIds = cartLines
+              .filter((line) => line.rowId === row.id)
+              .map((line) => line.matchId);
+            return (
             <InlineProductMatchRow
               key={row.id}
               query={row.query}
@@ -698,21 +868,20 @@ export default function HomeSearchBox({
               selectedId={row.selectedId}
               quantities={row.quantities}
               expanded={row.expanded}
-              disabled={isSubmitting}
+              cartMatchIds={cartMatchIds}
               onToggleExpanded={() => toggleExpanded(row.id)}
               onSelectMatch={(matchId) => selectMatch(row.id, matchId)}
+              onAddToCart={(matchId) => addToCart(row.id, matchId)}
               onQuantityChange={(matchId, next) =>
                 changeQuantity(row.id, matchId, next)
               }
               onRemove={() => removeProduct(row.id)}
+              onRetry={() => retryMatch(row.id)}
             />
-          ))}
+            );
+          })}
         </ul>
       </div>
-
-      {error ? (
-        <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
-      ) : null}
     </div>
   );
 }

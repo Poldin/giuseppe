@@ -134,3 +134,20 @@ export function buildShippingHints(
     .map(([targetShipping, gap]) => ({ gap, targetShipping }))
     .sort((a, b) => a.gap - b.gap);
 }
+
+/** Una sola frase: "ancora X per Y di spedizione oppure Z per W". */
+export function formatShippingHintsSentence(
+  hints: ShippingHint[],
+  formatPrice: (value: number) => string
+): string | null {
+  if (hints.length === 0) return null;
+
+  const [first, ...rest] = hints;
+  let sentence = `ancora ${formatPrice(first.gap)} per ${formatPrice(first.targetShipping)} di spedizione`;
+
+  for (const hint of rest) {
+    sentence += ` oppure ${formatPrice(hint.gap)} per ${formatPrice(hint.targetShipping)}`;
+  }
+
+  return sentence;
+}

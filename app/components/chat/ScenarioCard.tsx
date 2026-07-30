@@ -15,6 +15,7 @@ import { EcommerceLogoBadge } from "@/app/components/chat/EcommerceLogoBadge";
 import {
   buildShippingHints,
   calcolaSpedizione,
+  formatShippingHintsSentence,
   type ShippingTier,
 } from "@/app/lib/search/shipping-cost";
 import type {
@@ -702,6 +703,10 @@ export function ScenarioCard({
             prezzoProdottiEcom,
             tiersByEcommerce[ecomId] ?? []
           );
+          const shippingHintSentence = formatShippingHintsSentence(
+            shippingHints,
+            formatPrice
+          );
           const totaleParziale = prezzoProdottiEcom + prezzoSpedizioneEcom;
 
           return (
@@ -723,19 +728,11 @@ export function ScenarioCard({
                   prezzoSpedizioneEcom
                 )}
               </p>
-              {shippingHints.length > 0 ? (
-                <div className="mb-2 flex flex-col items-start gap-1.5">
-                  {shippingHints.map((hint) => (
-                    <span
-                      key={`${hint.targetShipping}-${hint.gap}`}
-                      className="inline-flex max-w-full rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-light leading-snug text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200"
-                    >
-                      ancora {formatPrice(hint.gap)} per{" "}
-                      {formatPrice(hint.targetShipping)} di spedizione
-                    </span>
-                  ))}
-                </div>
-              ) : null}
+              {shippingHintSentence ? (
+                  <p className="mb-2 w-fit max-w-full rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-light leading-snug text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200">
+                    {shippingHintSentence}
+                  </p>
+                ) : null}
               <ul className="divide-y divide-zinc-200/70 dark:divide-zinc-800/70">
                 {voci.map((voce) => {
                   const queryIndex = queryIndexByOffertaId.get(voce.offerta.id);

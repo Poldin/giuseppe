@@ -1,6 +1,7 @@
 import HomeSearchBox from "@/app/components/home/HomeSearchBox";
 import { HomeEcommerceBadges } from "@/app/components/home/HomeEcommerceBadges";
 import { HomeFaq } from "@/app/components/home/HomeFaq";
+import { HomeShareButton } from "@/app/components/home/HomeShareButton";
 import { HowItWorksButton } from "@/app/components/onboarding/HowItWorksButton";
 import { PubRelatedProducts } from "@/app/components/pub/PubRelatedProducts";
 import { fetchHomeRelatedPubProducts } from "@/app/lib/pub/related";
@@ -145,7 +146,10 @@ export default async function Home({ searchParams }: PageProps) {
         {/* Hero */}
         <section className="flex flex-col gap-3">
           <div className="flex flex-col gap-2">
-            <HowItWorksButton className="shrink-0 self-end" />
+            <div className="flex items-center justify-between gap-2">
+              <HomeShareButton />
+              <HowItWorksButton className="shrink-0" />
+            </div>
             <div className="flex items-end gap-4">
               <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-900 sm:h-24 sm:w-24">
                 <Image
@@ -190,6 +194,7 @@ export default async function Home({ searchParams }: PageProps) {
             <HomeSearchBox
               recentProducts={recentProducts}
               initialSession={initialSession}
+              ecommerces={ecommerces}
             />
           </div>
         </section>
