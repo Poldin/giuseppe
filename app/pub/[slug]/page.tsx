@@ -4,7 +4,7 @@ import {
   fetchPubProductBySlug,
   pubProductDisplayTitle,
 } from "@/app/lib/pub/product";
-import { fetchRelatedPubProducts } from "@/app/lib/pub/related";
+import { fetchRelatedPubProducts, RELATED_REVALIDATE_SECONDS } from "@/app/lib/pub/related";
 import {
   getPubProductDateModified,
   getPubProductJsonLd,
@@ -17,7 +17,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 /** ISR: prezzi, catalogo e correlati si aggiornano almeno ogni 12 ore. */
-export const revalidate = 43200;
+export const revalidate = RELATED_REVALIDATE_SECONDS;
 
 type PubProductPageProps = {
   params: Promise<{ slug: string }>;

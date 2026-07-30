@@ -1,11 +1,8 @@
-"use client";
-
 import type { FaqItem } from "@/app/lib/seo/site";
-import { ChevronDown } from "lucide-react";
-import { useState } from "react";
 
+/** FAQ sempre nel flusso del documento (niente accordion/`hidden`). */
 export function HomeFaq({ items }: { items: FaqItem[] }) {
-  const [openIndex, setOpenIndex] = useState(0);
+  if (items.length === 0) return null;
 
   return (
     <section
@@ -19,46 +16,16 @@ export function HomeFaq({ items }: { items: FaqItem[] }) {
       >
         FAQ
       </h2>
-      <div className="divide-y divide-zinc-100 dark:divide-zinc-900">
-        {items.map((item, index) => {
-          const isOpen = openIndex === index;
-          const panelId = `faq-panel-${index}`;
-          const buttonId = `faq-button-${index}`;
-
-          return (
-            <div key={item.question} className="py-1">
-              <h3>
-                <button
-                  id={buttonId}
-                  type="button"
-                  aria-expanded={isOpen}
-                  aria-controls={panelId}
-                  onClick={() => setOpenIndex(isOpen ? -1 : index)}
-                  className="flex w-full items-center justify-between gap-3 py-4 text-left font-bold leading-snug transition-colors hover:text-zinc-600 dark:hover:text-zinc-300"
-                >
-                  <span>{item.question}</span>
-                  <ChevronDown
-                    aria-hidden
-                    className={`h-5 w-5 shrink-0 text-zinc-400 transition-transform duration-200 ${
-                      isOpen ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
-              </h3>
-              {/* Risposta sempre nel DOM per crawler/AI; nascosta solo in UI se chiusa */}
-              <div
-                id={panelId}
-                role="region"
-                aria-labelledby={buttonId}
-                hidden={!isOpen}
-                className="pb-4 leading-relaxed text-zinc-600 dark:text-zinc-400"
-              >
-                {item.answer}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <dl className="divide-y divide-zinc-100 dark:divide-zinc-900">
+        {items.map((item) => (
+          <div key={item.question} className="py-5">
+            <dt className="font-bold leading-snug">{item.question}</dt>
+            <dd className="mt-2 leading-relaxed text-zinc-600 dark:text-zinc-400">
+              {item.answer}
+            </dd>
+          </div>
+        ))}
+      </dl>
     </section>
   );
 }

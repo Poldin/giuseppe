@@ -35,9 +35,6 @@ export const metadata: Metadata = {
   creator: SITE_NAME,
   publisher: SITE_NAME,
   category: "business",
-  alternates: {
-    canonical: "/",
-  },
   robots: {
     index: true,
     follow: true,
@@ -61,7 +58,7 @@ export const metadata: Metadata = {
         url: "/giuseppe.jpeg",
         width: 1200,
         height: 1200,
-        alt: "Giuseppe — confronto prezzi e prodotti per studi dentistici",
+        alt: "Giuseppe, comparatore di prezzi e prodotti per studi dentistici",
       },
     ],
   },

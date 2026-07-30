@@ -4,7 +4,7 @@ export const SITE_NAME = "Giuseppe";
 export const SITE_EMAIL = "info@giuseppeacquisti.it";
 /** Payoff corto sotto al brand (footer, 404, …). */
 export const SITE_PAYOFF =
-  "confronto prezzi e prodotti per studi dentistici";
+  "comparatore di prezzi e prodotti per studi dentistici";
 
 /** Ecommerce attualmente confrontati. */
 export const COMPARED_ECOMMERCES = [
@@ -76,17 +76,22 @@ export function getPriceTransparency(now = new Date()): string {
 }
 
 /**
- * Descrizione del servizio per crawler e AI.
- * Deve restare allineata a ciò che Giuseppe fa davvero in prodotto.
+ * Meta description (title/OG) — corta e chiara sull’anima del prodotto.
+ * Dettagli operativi restano in FAQ, HowTo e featureList JSON-LD.
  */
 export const SITE_DESCRIPTION =
-  "Giuseppe è un servizio gratuito di confronto prezzi e prodotti per studi dentistici. Indichi i materiali e i consumabili che ti servono: Giuseppe cerca tra oltre 100.000 articoli e, ad oggi, confronta prodotti da Gerhò, Dontalia, Dentaltix e Abutment Compatibili. I prezzi e i prodotti mostrati si basano su un catalogo aggiornato quotidianamente; il prezzo finale e l’IVA vanno sempre verificati sul sito del rivenditore al momento dell’acquisto. Riceve dalle 500 alle 2.000 richieste giornaliere di comparazione, con un tempo medio di confronto tra 2,3 e 4,9 secondi. Come funziona: 1) indica la lista dei prodotti che ti servono in studio; 2) Giuseppe ricerca sui principali rivenditori e mostra le migliori offerte; 3) selezioni i prodotti migliori per ogni esigenza e componi l'ordine migliore; 4) acquisti in tutta sicurezza direttamente dai rivenditori. Contatto: info@giuseppeacquisti.it.";
+  "Comparatore gratuito di prezzi e prodotti per studi dentistici. Confronta oltre 100.000 articoli odontoiatrici su Gerhò, Dontalia, Dentaltix e Abutment Compatibili.";
+
+/** Descrizione estesa per JSON-LD / AI — allineata al prodotto reale. */
+export const SITE_DESCRIPTION_FULL =
+  `${SITE_DESCRIPTION} Indichi i materiali e i consumabili che ti servono: Giuseppe cerca tra i cataloghi aggiornati quotidianamente; il prezzo finale e l’IVA vanno sempre verificati sul sito del rivenditore. Riceve dalle 500 alle 2.000 richieste giornaliere di comparazione, con un tempo medio tra 2,3 e 4,9 secondi. Acquisti in tutta sicurezza direttamente dai rivenditori. Contatto: ${SITE_EMAIL}.`;
 
 export const SITE_TITLE =
-  "Giuseppe — Confronto prezzi e prodotti per studi dentistici";
+  "Giuseppe — Comparatore prezzi e prodotti per studi dentistici";
 
 export const SITE_KEYWORDS = [
   "Giuseppe",
+  "comparatore prezzi dentali",
   "confronto prezzi dentali",
   "materiali dentali",
   "ecommerce dentale",
@@ -136,7 +141,7 @@ export function getFaqItems(now = new Date()): FaqItem[] {
     {
       question: "Cos’è Giuseppe?",
       answer:
-        "Giuseppe è un servizio gratuito di confronto prezzi e prodotti per studi dentistici. Indichi i materiali e i consumabili che ti servono e Giuseppe confronta le offerte sui principali ecommerce dentali, aiutandoti a scegliere la combinazione migliore. L’acquisto avviene direttamente presso i rivenditori.",
+        "Giuseppe è un comparatore gratuito di prezzi e prodotti per studi dentistici. Indichi i materiali e i consumabili che ti servono e Giuseppe confronta le offerte sui principali ecommerce dentali, aiutandoti a scegliere la combinazione migliore. L’acquisto avviene direttamente presso i rivenditori.",
     },
     {
       question: "Quali ecommerce confronta oggi Giuseppe?",
@@ -187,9 +192,32 @@ export function getHomeJsonLd(now = new Date()) {
         "@id": `${SITE_URL}/#website`,
         url: SITE_URL,
         name: SITE_NAME,
-        description: SITE_DESCRIPTION,
+        description: SITE_DESCRIPTION_FULL,
         inLanguage: "it-IT",
         publisher: { "@id": `${SITE_URL}/#organization` },
+        potentialAction: {
+          "@type": "SearchAction",
+          target: {
+            "@type": "EntryPoint",
+            urlTemplate: `${SITE_URL}/pub?q={search_term_string}`,
+          },
+          "query-input": "required name=search_term_string",
+        },
+      },
+      {
+        "@type": "WebPage",
+        "@id": `${SITE_URL}/#webpage`,
+        url: SITE_URL,
+        name: SITE_TITLE,
+        description: SITE_DESCRIPTION,
+        inLanguage: "it-IT",
+        isPartOf: { "@id": `${SITE_URL}/#website` },
+        about: { "@id": `${SITE_URL}/#app` },
+        primaryImageOfPage: {
+          "@type": "ImageObject",
+          url: `${SITE_URL}/giuseppe.jpeg`,
+        },
+        mainEntity: { "@id": `${SITE_URL}/#app` },
       },
       {
         "@type": "Organization",
@@ -197,7 +225,7 @@ export function getHomeJsonLd(now = new Date()) {
         name: SITE_NAME,
         url: SITE_URL,
         logo: `${SITE_URL}/giuseppe.jpeg`,
-        description: SITE_DESCRIPTION,
+        description: SITE_DESCRIPTION_FULL,
         email: SITE_EMAIL,
         contactPoint: {
           "@type": "ContactPoint",
@@ -215,7 +243,7 @@ export function getHomeJsonLd(now = new Date()) {
         operatingSystem: "Web",
         inLanguage: "it-IT",
         isAccessibleForFree: true,
-        description: `${SITE_DESCRIPTION} Ultimo aggiornamento del catalogo: ${lastUpdate}.`,
+        description: `${SITE_DESCRIPTION_FULL} Ultimo aggiornamento del catalogo: ${lastUpdate}.`,
         audience: {
           "@type": "Audience",
           audienceType: "Studi dentistici",
@@ -224,9 +252,10 @@ export function getHomeJsonLd(now = new Date()) {
           "@type": "Offer",
           price: "0",
           priceCurrency: "EUR",
-          description: "Servizio gratuito per gli studi dentistici",
+          description: "Comparatore gratuito per gli studi dentistici",
         },
         featureList: [
+          "Comparatore di prezzi e prodotti per studi dentistici",
           "Confronto prezzi su oltre 100.000 articoli dentali",
           `Ad oggi confronta prodotti da ${COMPARED_ECOMMERCES.join(", ")}`,
           "Catalogo aggiornato quotidianamente",

@@ -2,6 +2,8 @@ import HomeSearchBox from "@/app/components/home/HomeSearchBox";
 import { HomeEcommerceBadges } from "@/app/components/home/HomeEcommerceBadges";
 import { HomeFaq } from "@/app/components/home/HomeFaq";
 import { HowItWorksButton } from "@/app/components/onboarding/HowItWorksButton";
+import { PubRelatedProducts } from "@/app/components/pub/PubRelatedProducts";
+import { fetchHomeRelatedPubProducts } from "@/app/lib/pub/related";
 import { fetchRecentPublicProducts } from "@/app/lib/search/chat-store";
 import { getHomesearchSession } from "@/app/lib/search/homesearch-store";
 import { fetchEcommerceCatalog } from "@/app/lib/search/match-products";
@@ -10,8 +12,45 @@ import {
   getHomeJsonLd,
   getPriceTransparency,
   HOW_IT_WORKS_STEPS,
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_TITLE,
+  SITE_URL,
 } from "@/app/lib/seo/site";
+import type { Metadata } from "next";
 import Image from "next/image";
+
+export const metadata: Metadata = {
+  title: {
+    absolute: SITE_TITLE,
+  },
+  description: SITE_DESCRIPTION,
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    locale: "it_IT",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: [
+      {
+        url: "/giuseppe.jpeg",
+        width: 1200,
+        height: 1200,
+        alt: "Giuseppe, comparatore di prezzi e prodotti per studi dentistici",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: ["/giuseppe.jpeg"],
+  },
+};
 
 const MONTHS_IT = [
   "gennaio",
@@ -81,11 +120,16 @@ export default async function Home({ searchParams }: PageProps) {
   const { src: rawSrc } = await searchParams;
   const src = typeof rawSrc === "string" ? rawSrc.trim() : "";
 
-  const [ecommerces, recentProducts, initialSession] = await Promise.all([
-    fetchEcommerceCatalog(),
-    fetchRecentPublicProducts(),
-    src ? getHomesearchSession(src) : Promise.resolve(null),
-  ]);
+  const [ecommerces, recentProducts, relatedProducts, initialSession] =
+    await Promise.all([
+      fetchEcommerceCatalog(),
+      fetchRecentPublicProducts(),
+      fetchHomeRelatedPubProducts().catch((error) => {
+        console.error("Home related products failed:", error);
+        return [];
+      }),
+      src ? getHomesearchSession(src) : Promise.resolve(null),
+    ]);
   const yesterdayStats = getYesterdaySearchStats();
   const priceTransparency = getPriceTransparency();
   const faqItems = getFaqItems();
@@ -106,7 +150,7 @@ export default async function Home({ searchParams }: PageProps) {
               <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-900 sm:h-24 sm:w-24">
                 <Image
                   src="/giuseppe.jpeg"
-                  alt="Giuseppe"
+                  alt="Giuseppe, comparatore di prezzi e prodotti per studi dentistici"
                   fill
                   sizes="96px"
                   className="object-cover"
@@ -117,21 +161,26 @@ export default async function Home({ searchParams }: PageProps) {
                 <p className="text-lg text-zinc-600 dark:text-zinc-400 sm:text-xl">
                   Ciao👋 io sono
                 </p>
-                <h1 className="text-4xl font-black uppercase leading-none tracking-tighter sm:text-5xl">
+                {/* Brand visivo; l’H1 sotto include nome + payoff keyword */}
+                <p
+                  aria-hidden="true"
+                  className="text-4xl font-black uppercase leading-none tracking-tighter sm:text-5xl"
+                >
                   Giuseppe
-                </h1>
+                </p>
               </div>
             </div>
           </div>
 
           <div className="flex flex-col gap-1">
-            <p className="text-base leading-relaxed text-zinc-900 sm:text-lg">
+            <h1 className="text-base leading-relaxed text-zinc-900 sm:text-lg">
+              <span className="sr-only">Giuseppe — </span>
               <span className="box-decoration-clone bg-zinc-900 px-1 py-0.5 text-white dark:bg-white dark:text-zinc-900">
                 confronto prezzi e prodotti{" "}
                 <span className="font-extrabold">su +100K articoli</span>{" "}
-                disponibili
+                odontoiatrici
               </span>
-            </p>
+            </h1>
             <p className="text-xs text-zinc-500 dark:text-zinc-500">
               ieri, {yesterdayStats.day} {yesterdayStats.monthName} sono state
               eseguite {yesterdayStats.count.toLocaleString("it-IT")} ricerche
@@ -144,6 +193,11 @@ export default async function Home({ searchParams }: PageProps) {
             />
           </div>
         </section>
+
+        <PubRelatedProducts
+          products={relatedProducts}
+          className="mt-20 min-w-0 scroll-mt-6 border-t border-zinc-100 pt-16 dark:border-zinc-900"
+        />
 
         {/* Come funziona */}
         <section

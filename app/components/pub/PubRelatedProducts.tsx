@@ -38,10 +38,12 @@ export function PubRelatedProducts({
   fromProductId,
   fromPubSlug,
   products,
+  className,
 }: {
-  fromProductId: string;
-  fromPubSlug: string;
+  fromProductId?: string;
+  fromPubSlug?: string;
   products: RelatedPubProduct[];
+  className?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -100,10 +102,14 @@ export function PubRelatedProducts({
   if (products.length === 0) return null;
 
   const showScrollControls = canScrollLeft || canScrollRight;
+  const canTrack = Boolean(fromProductId && fromPubSlug);
 
   return (
     <section
-      className="mt-14 min-w-0 border-t border-zinc-100 pt-8 dark:border-zinc-900"
+      className={
+        className ??
+        "mt-14 min-w-0 border-t border-zinc-100 pt-8 dark:border-zinc-900"
+      }
       aria-labelledby="prodotti-correlati-heading"
     >
       <div className="mb-4 flex items-center justify-between gap-2">
@@ -111,7 +117,7 @@ export function PubRelatedProducts({
           id="prodotti-correlati-heading"
           className="text-lg uppercase tracking-tighter"
         >
-          potrebbero interessarti
+          altri recenti guardati da altri utenti
         </h2>
 
         {showScrollControls ? (
@@ -153,13 +159,16 @@ export function PubRelatedProducts({
                   href={pubProductPath(item.pub_slug)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  onClick={() =>
-                    trackRelatedClick({
-                      fromProductId,
-                      toProductId: item.id,
-                      fromPubSlug,
-                      toPubSlug: item.pub_slug,
-                    })
+                  onClick={
+                    canTrack
+                      ? () =>
+                          trackRelatedClick({
+                            fromProductId: fromProductId!,
+                            toProductId: item.id,
+                            fromPubSlug: fromPubSlug!,
+                            toPubSlug: item.pub_slug,
+                          })
+                      : undefined
                   }
                   className="flex h-full w-64 flex-col gap-3 rounded-xl border border-zinc-200/80 bg-white p-4 transition-[box-shadow,border-color] hover:border-zinc-300 hover:shadow-sm sm:w-72 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
                 >
