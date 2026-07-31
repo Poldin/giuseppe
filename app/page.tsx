@@ -114,12 +114,15 @@ function getYesterdaySearchStats(now = new Date()) {
 export const revalidate = 14400;
 
 type PageProps = {
-  searchParams: Promise<{ src?: string }>;
+  searchParams: Promise<{ src?: string; wanted?: string }>;
 };
 
 export default async function Home({ searchParams }: PageProps) {
-  const { src: rawSrc } = await searchParams;
+  const { src: rawSrc, wanted: rawWanted } = await searchParams;
   const src = typeof rawSrc === "string" ? rawSrc.trim() : "";
+  // With ?src=, session restore wins — wanted is ignored (still cleared client-side).
+  const initialWanted =
+    !src && typeof rawWanted === "string" ? rawWanted.trim() : "";
 
   const [ecommerces, recentProducts, relatedProducts, initialSession] =
     await Promise.all([
@@ -194,6 +197,7 @@ export default async function Home({ searchParams }: PageProps) {
             <HomeSearchBox
               recentProducts={recentProducts}
               initialSession={initialSession}
+              initialWanted={initialWanted}
               ecommerces={ecommerces}
             />
           </div>

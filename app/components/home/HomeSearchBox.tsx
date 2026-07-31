@@ -25,6 +25,24 @@ const MAX_PRODUCTS = 20;
 /** One inline-match at a time; queued rows still show the loading UI. */
 const MAX_CONCURRENT_MATCHES = 1;
 const SRC_PARAM = "src";
+const WANTED_PARAM = "wanted";
+
+/** Comma-separated product keywords from ?wanted= (URL-decoded by the platform). */
+function parseWantedKeywords(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function clearWantedFromUrl() {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has(WANTED_PARAM)) return;
+  url.searchParams.delete(WANTED_PARAM);
+  const next = `${url.pathname}${url.search}${url.hash}`;
+  window.history.replaceState(window.history.state, "", next);
+}
 
 type ProductRow = {
   id: string;
@@ -192,10 +210,13 @@ async function persistQueryUpdate(
 export default function HomeSearchBox({
   recentProducts = [],
   initialSession = null,
+  initialWanted = "",
   ecommerces = [],
 }: {
   recentProducts?: string[];
   initialSession?: HomesearchSessionSnapshot | null;
+  /** Pre-decoded ?wanted= value; ignored when a session (?src=) is present. */
+  initialWanted?: string;
   ecommerces?: EcommerceInfo[];
 }) {
   const tiersByEcommerce = buildShippingTiersMap(ecommerces);
@@ -586,6 +607,17 @@ export default function HomeSearchBox({
     },
     [createDbQuery, enqueueInlineMatch]
   );
+
+  // Bootstrap from ?wanted=… — same path as typing products manually; strip param from URL.
+  useEffect(() => {
+    clearWantedFromUrl();
+    if (initialSession || !initialWanted) return;
+    for (const keyword of parseWantedKeywords(initialWanted)) {
+      addProduct(keyword);
+    }
+    // Once on mount for the deep-link payload.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const removeProduct = useCallback(
     (rowId: string) => {
