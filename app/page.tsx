@@ -6,7 +6,6 @@ import { HowItWorksButton } from "@/app/components/onboarding/HowItWorksButton";
 import { PubRelatedProducts } from "@/app/components/pub/PubRelatedProducts";
 import { fetchHomeRelatedPubProducts } from "@/app/lib/pub/related";
 import { fetchRecentPublicProducts } from "@/app/lib/search/chat-store";
-import { getHomesearchSession } from "@/app/lib/search/homesearch-store";
 import { fetchEcommerceCatalog } from "@/app/lib/search/match-products";
 import {
   getFaqItems,
@@ -110,30 +109,20 @@ function getYesterdaySearchStats(now = new Date()) {
 /**
  * ISR ogni 4 ore: prodotti recenti, stats “ieri” e trasparenza prezzi
  * restano freschi senza battere il DB a ogni visita.
+ * ?src= / ?wanted= li gestisce HomeSearchBox in client (niente searchParams qui,
+ * altrimenti la route diventa dinamica e l’ISR non tiene).
  */
 export const revalidate = 14400;
 
-type PageProps = {
-  searchParams: Promise<{ src?: string; wanted?: string }>;
-};
-
-export default async function Home({ searchParams }: PageProps) {
-  const { src: rawSrc, wanted: rawWanted } = await searchParams;
-  const src = typeof rawSrc === "string" ? rawSrc.trim() : "";
-  // With ?src=, session restore wins — wanted is ignored (still cleared client-side).
-  const initialWanted =
-    !src && typeof rawWanted === "string" ? rawWanted.trim() : "";
-
-  const [ecommerces, recentProducts, relatedProducts, initialSession] =
-    await Promise.all([
-      fetchEcommerceCatalog(),
-      fetchRecentPublicProducts(),
-      fetchHomeRelatedPubProducts().catch((error) => {
-        console.error("Home related products failed:", error);
-        return [];
-      }),
-      src ? getHomesearchSession(src) : Promise.resolve(null),
-    ]);
+export default async function Home() {
+  const [ecommerces, recentProducts, relatedProducts] = await Promise.all([
+    fetchEcommerceCatalog(),
+    fetchRecentPublicProducts(),
+    fetchHomeRelatedPubProducts().catch((error) => {
+      console.error("Home related products failed:", error);
+      return [];
+    }),
+  ]);
   const yesterdayStats = getYesterdaySearchStats();
   const priceTransparency = getPriceTransparency();
   const faqItems = getFaqItems();
@@ -196,8 +185,6 @@ export default async function Home({ searchParams }: PageProps) {
           <div className="mt-10">
             <HomeSearchBox
               recentProducts={recentProducts}
-              initialSession={initialSession}
-              initialWanted={initialWanted}
               ecommerces={ecommerces}
             />
           </div>

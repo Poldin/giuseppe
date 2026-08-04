@@ -1,8 +1,8 @@
 import { SeoHubSearch } from "@/app/components/seo/SeoHubSearch";
+import { SeoHubSearchFallback } from "@/app/components/seo/SeoHubSearchFallback";
 import {
   fetchPubHubSamples,
   formatPubPrice,
-  searchPubProducts,
 } from "@/app/lib/pub/product";
 import {
   pubHubAbsoluteUrl,
@@ -11,6 +11,7 @@ import {
 } from "@/app/lib/seo/pub-product";
 import { SITE_NAME } from "@/app/lib/seo/site";
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 export const revalidate = 3600;
 
@@ -36,36 +37,36 @@ export const metadata: Metadata = {
   },
 };
 
-type PageProps = {
-  searchParams: Promise<{ q?: string }>;
-};
+export default async function PubHubPage() {
+  const rows = await fetchPubHubSamples();
+  const sampleHits = rows.map((hit) => {
+    const price = formatPubPrice(hit.final_price);
+    const meta = [hit.brand, hit.shop_name].filter(Boolean).join(" · ");
+    return {
+      href: pubProductPath(hit.pub_slug),
+      title: hit.product_name,
+      eyebrow: meta || null,
+      hint: price ? `${price} — apri scheda` : "Apri scheda prodotto",
+    };
+  });
 
-export default async function PubHubPage({ searchParams }: PageProps) {
-  const { q: rawQ } = await searchParams;
-  const q = (rawQ ?? "").trim();
-  const rows = q ? await searchPubProducts(q) : await fetchPubHubSamples();
+  const props = {
+    hub: "pub" as const,
+    hubPath: pubHubPath(),
+    breadcrumbLabel: "Prodotti",
+    title: "Cerca prodotti",
+    description:
+      "Schede prodotto con prezzi dai principali ecommerce dentali. Digita un nome o un brand: mostriamo fino a 20 risultati.",
+    searchLabel: "Cerca prodotto",
+    placeholder: "Es. guanti nitrile, composite 3M",
+    emptyHint: "Digita un prodotto o un brand per iniziare.",
+    sampleHits,
+    inputId: "pub-q",
+  };
 
   return (
-    <SeoHubSearch
-      hubPath={pubHubPath()}
-      breadcrumbLabel="Prodotti"
-      title="Cerca prodotti"
-      description="Schede prodotto con prezzi dai principali ecommerce dentali. Digita un nome o un brand: mostriamo fino a 20 risultati."
-      searchLabel="Cerca prodotto"
-      placeholder="Es. guanti nitrile, composite 3M"
-      emptyHint="Digita un prodotto o un brand per iniziare."
-      q={q}
-      inputId="pub-q"
-      hits={rows.map((hit) => {
-        const price = formatPubPrice(hit.final_price);
-        const meta = [hit.brand, hit.shop_name].filter(Boolean).join(" · ");
-        return {
-          href: pubProductPath(hit.pub_slug),
-          title: hit.product_name,
-          eyebrow: meta || null,
-          hint: price ? `${price} — apri scheda` : "Apri scheda prodotto",
-        };
-      })}
-    />
+    <Suspense fallback={<SeoHubSearchFallback {...props} />}>
+      <SeoHubSearch {...props} />
+    </Suspense>
   );
 }

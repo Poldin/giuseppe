@@ -1,8 +1,6 @@
 import { SeoHubSearch } from "@/app/components/seo/SeoHubSearch";
-import {
-  fetchMedicalDeviceHubSamples,
-  searchMedicalDevices,
-} from "@/app/lib/medical-device/device";
+import { SeoHubSearchFallback } from "@/app/components/seo/SeoHubSearchFallback";
+import { fetchMedicalDeviceHubSamples } from "@/app/lib/medical-device/device";
 import {
   medicalDeviceHubAbsoluteUrl,
   medicalDeviceHubPath,
@@ -10,6 +8,7 @@ import {
 } from "@/app/lib/seo/medical-device";
 import { SITE_NAME } from "@/app/lib/seo/site";
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 export const revalidate = 3600;
 
@@ -35,41 +34,37 @@ export const metadata: Metadata = {
   },
 };
 
-type PageProps = {
-  searchParams: Promise<{ q?: string }>;
-};
+export default async function MedicalDeviceHubPage() {
+  const rows = await fetchMedicalDeviceHubSamples();
+  const sampleHits = rows.map((hit) => {
+    const meta = [hit.fabbricante, hit.classificazione_cnd]
+      .filter(Boolean)
+      .join(" · ");
+    return {
+      href: medicalDevicePath(hit.slug),
+      title: hit.name,
+      eyebrow: meta || null,
+      hint: "Apri scheda dispositivo",
+    };
+  });
 
-export default async function MedicalDeviceHubPage({
-  searchParams,
-}: PageProps) {
-  const { q: rawQ } = await searchParams;
-  const q = (rawQ ?? "").trim();
-  const rows = q
-    ? await searchMedicalDevices(q)
-    : await fetchMedicalDeviceHubSamples();
+  const props = {
+    hub: "medical_device" as const,
+    hubPath: medicalDeviceHubPath(),
+    breadcrumbLabel: "Dispositivi medici",
+    title: "Cerca dispositivi medici",
+    description:
+      "Schede dispositivo per denominazione, fabbricante o classificazione CND. Digita una parola chiave: fino a 20 risultati.",
+    searchLabel: "Cerca dispositivo",
+    placeholder: "Es. fabbricante, denominazione, CND",
+    emptyHint: "Digita una denominazione, un fabbricante o un codice CND.",
+    sampleHits,
+    inputId: "device-q",
+  };
 
   return (
-    <SeoHubSearch
-      hubPath={medicalDeviceHubPath()}
-      breadcrumbLabel="Dispositivi medici"
-      title="Cerca dispositivi medici"
-      description="Schede dispositivo per denominazione, fabbricante o classificazione CND. Digita una parola chiave: fino a 20 risultati."
-      searchLabel="Cerca dispositivo"
-      placeholder="Es. fabbricante, denominazione, CND"
-      emptyHint="Digita una denominazione, un fabbricante o un codice CND."
-      q={q}
-      inputId="device-q"
-      hits={rows.map((hit) => {
-        const meta = [hit.fabbricante, hit.classificazione_cnd]
-          .filter(Boolean)
-          .join(" · ");
-        return {
-          href: medicalDevicePath(hit.slug),
-          title: hit.name,
-          eyebrow: meta || null,
-          hint: "Apri scheda dispositivo",
-        };
-      })}
-    />
+    <Suspense fallback={<SeoHubSearchFallback {...props} />}>
+      <SeoHubSearch {...props} />
+    </Suspense>
   );
 }

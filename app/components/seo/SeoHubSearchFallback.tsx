@@ -1,29 +1,9 @@
-"use client";
-
 import { ChatSponsoredBanner } from "@/app/components/chat/ChatSponsoredBanner";
-import type { SeoHubHit, SeoHubKind } from "@/app/lib/seo/hub-hit";
+import type { SeoHubHit } from "@/app/lib/seo/hub-hit";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
 
-export type { SeoHubHit, SeoHubKind };
-
-type SeoHubSearchProps = {
-  hub: SeoHubKind;
-  hubPath: string;
-  breadcrumbLabel: string;
-  title: string;
-  description: string;
-  searchLabel: string;
-  placeholder: string;
-  emptyHint: string;
-  /** Campioni ISR (senza ?q=). */
-  sampleHits: SeoHubHit[];
-  inputId: string;
-};
-
-export function SeoHubSearch({
-  hub,
+/** Fallback Suspense: hub ISR senza useSearchParams. */
+export function SeoHubSearchFallback({
   hubPath,
   breadcrumbLabel,
   title,
@@ -33,66 +13,17 @@ export function SeoHubSearch({
   emptyHint,
   sampleHits,
   inputId,
-}: SeoHubSearchProps) {
-  const searchParams = useSearchParams();
-  const q = (searchParams.get("q") ?? "").trim();
-  const [hits, setHits] = useState<SeoHubHit[]>(q ? [] : sampleHits);
-  const [loading, setLoading] = useState(Boolean(q));
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!q) {
-      setHits(sampleHits);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
-    let cancelled = false;
-    const controller = new AbortController();
-    setLoading(true);
-    setError(null);
-    setHits([]);
-
-    void fetch(
-      `/api/hub/search?hub=${encodeURIComponent(hub)}&q=${encodeURIComponent(q)}`,
-      { signal: controller.signal }
-    )
-      .then(async (response) => {
-        const payload = (await response.json()) as {
-          hits?: SeoHubHit[];
-          error?: string;
-        };
-        if (!response.ok) {
-          throw new Error(payload.error ?? "Errore ricerca");
-        }
-        return Array.isArray(payload.hits) ? payload.hits : [];
-      })
-      .then((nextHits) => {
-        if (cancelled) return;
-        setHits(nextHits);
-        setLoading(false);
-      })
-      .catch((fetchError) => {
-        if (cancelled || controller.signal.aborted) return;
-        console.error("hub search failed:", fetchError);
-        setError("Ricerca non riuscita. Riprova.");
-        setHits([]);
-        setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [hub, q, sampleHits]);
-
-  const heading = q
-    ? loading
-      ? `Cerco «${q}»…`
-      : `${hits.length} risultat${hits.length === 1 ? "o" : "i"} per «${q}»`
-    : "Esempi recenti";
-
+}: {
+  hubPath: string;
+  breadcrumbLabel: string;
+  title: string;
+  description: string;
+  searchLabel: string;
+  placeholder: string;
+  emptyHint: string;
+  sampleHits: SeoHubHit[];
+  inputId: string;
+}) {
   return (
     <>
       <div className="min-h-screen bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
@@ -130,8 +61,6 @@ export function SeoHubSearch({
                 id={inputId}
                 name="q"
                 type="search"
-                defaultValue={q}
-                key={q}
                 placeholder={placeholder}
                 className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none ring-zinc-900 focus:ring-2 dark:border-zinc-800 dark:bg-zinc-950"
               />
@@ -144,25 +73,17 @@ export function SeoHubSearch({
             </div>
           </form>
 
-          <section className="mt-10" aria-label="Risultati" aria-busy={loading}>
+          <section className="mt-10" aria-label="Risultati">
             <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-zinc-500">
-              {heading}
+              Esempi recenti
             </h2>
-            {error ? (
-              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-            ) : loading ? (
+            {sampleHits.length === 0 ? (
               <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                Caricamento risultati…
-              </p>
-            ) : hits.length === 0 ? (
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                {q
-                  ? "Nessun risultato. Prova con un’altra parola chiave."
-                  : emptyHint}
+                {emptyHint}
               </p>
             ) : (
               <ul className="divide-y divide-zinc-100 dark:divide-zinc-900">
-                {hits.map((hit) => (
+                {sampleHits.map((hit) => (
                   <li key={hit.href} className="py-4">
                     <Link href={hit.href} className="group block">
                       {hit.eyebrow ? (

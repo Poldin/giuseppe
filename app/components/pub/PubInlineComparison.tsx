@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Confronto offerte su /pub — solo umani.
- * I crawler ricevono già HTML ISR (prezzo, FAQ, JSON-LD); questa strip
- * parte in client e l’API inline-match risponde vuota ai bot.
+ * Confronto offerte su /pub — solo umani, on-demand.
+ * Nessuna RPC axe al mount: parte solo dopo click (click-to-compare).
+ * I crawler ricevono già HTML ISR; l’API risponde vuota ai bot.
  */
 import {
   InlineProductMatchRow,
@@ -11,7 +11,9 @@ import {
 } from "@/app/components/home/InlineProductMatchRow";
 import { GiuseppeCompareCta } from "@/app/components/layout/GiuseppeCompareCta";
 import type { InlineMatchCandidate } from "@/app/lib/search/inline-match";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+type ComparePhase = "idle" | "loading" | "ready" | "empty" | "error";
 
 function buildQuantities(
   matches: InlineMatchCandidate[],
@@ -24,27 +26,50 @@ function buildQuantities(
   return next;
 }
 
+function toRowStatus(phase: ComparePhase): InlineProductRowStatus {
+  if (phase === "idle") return "empty";
+  return phase;
+}
+
 export function PubInlineComparison({ productName }: { productName: string }) {
   const query = productName.trim();
-  const [status, setStatus] = useState<InlineProductRowStatus>("loading");
+  const [phase, setPhase] = useState<ComparePhase>("idle");
   const [matches, setMatches] = useState<InlineMatchCandidate[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [expanded, setExpanded] = useState(true);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setPhase("idle");
+    setMatches([]);
+    setSelectedId(null);
+    setQuantities({});
+    setExpanded(true);
+  }, [query]);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
+  const runCompare = useCallback(() => {
     if (query.length < 2) {
-      setStatus("empty");
+      setPhase("empty");
       setMatches([]);
       setSelectedId(null);
       setQuantities({});
       return;
     }
 
-    let cancelled = false;
+    abortRef.current?.abort();
     const controller = new AbortController();
+    abortRef.current = controller;
 
-    setStatus("loading");
+    setPhase("loading");
     setMatches([]);
     setSelectedId(null);
     setQuantities({});
@@ -68,7 +93,7 @@ export function PubInlineComparison({ productName }: { productName: string }) {
         return payload;
       })
       .then((payload) => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         const nextMatches = Array.isArray(payload.matches)
           ? payload.matches
           : [];
@@ -79,21 +104,16 @@ export function PubInlineComparison({ productName }: { productName: string }) {
         setMatches(nextMatches);
         setSelectedId(nextSelected);
         setQuantities(buildQuantities(nextMatches));
-        setStatus(nextMatches.length > 0 ? "ready" : "empty");
+        setPhase(nextMatches.length > 0 ? "ready" : "empty");
       })
       .catch((error) => {
-        if (cancelled || controller.signal.aborted) return;
+        if (controller.signal.aborted) return;
         console.error("pub inline match failed:", error);
-        setStatus("error");
+        setPhase("error");
         setMatches([]);
         setSelectedId(null);
         setQuantities({});
       });
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
   }, [query]);
 
   if (!query) return null;
@@ -110,25 +130,36 @@ export function PubInlineComparison({ productName }: { productName: string }) {
         Confronta altre offerte
       </h2>
 
-      <ul className="flex flex-col gap-2">
-        <InlineProductMatchRow
-          query={query}
-          status={status}
-          matches={matches}
-          selectedId={selectedId}
-          quantities={quantities}
-          expanded={expanded}
-          showRemove={false}
-          onToggleExpanded={() => setExpanded((value) => !value)}
-          onSelectMatch={setSelectedId}
-          onQuantityChange={(matchId, next) => {
-            setQuantities((current) => ({
-              ...current,
-              [matchId]: Math.max(1, next),
-            }));
-          }}
-        />
-      </ul>
+      {phase === "idle" ? (
+        <button
+          type="button"
+          onClick={runCompare}
+          className="flex w-full items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50 px-5 py-4 text-sm font-semibold text-zinc-900 transition-colors hover:border-zinc-300 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-700 dark:hover:bg-zinc-800"
+        >
+          Confronta prezzi su altri shop
+        </button>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          <InlineProductMatchRow
+            query={query}
+            status={toRowStatus(phase)}
+            matches={matches}
+            selectedId={selectedId}
+            quantities={quantities}
+            expanded={expanded}
+            showRemove={false}
+            onToggleExpanded={() => setExpanded((value) => !value)}
+            onSelectMatch={setSelectedId}
+            onQuantityChange={(matchId, next) => {
+              setQuantities((current) => ({
+                ...current,
+                [matchId]: Math.max(1, next),
+              }));
+            }}
+            onRetry={phase === "error" ? runCompare : undefined}
+          />
+        </ul>
+      )}
 
       <GiuseppeCompareCta className="mt-5" />
     </section>

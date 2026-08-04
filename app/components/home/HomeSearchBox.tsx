@@ -214,8 +214,9 @@ export default function HomeSearchBox({
   ecommerces = [],
 }: {
   recentProducts?: string[];
+  /** @deprecated Prefer ?src= client restore; kept for optional SSR hydrate. */
   initialSession?: HomesearchSessionSnapshot | null;
-  /** Pre-decoded ?wanted= value; ignored when a session (?src=) is present. */
+  /** @deprecated Prefer ?wanted= client bootstrap. */
   initialWanted?: string;
   ecommerces?: EcommerceInfo[];
 }) {
@@ -558,7 +559,26 @@ export default function HomeSearchBox({
     runMatchRef.current = runInlineMatch;
   }, [runInlineMatch]);
 
-  // Re-run match for hydrated rows interrupted mid-loading.
+  const applySessionSnapshot = useCallback(
+    (session: HomesearchSessionSnapshot) => {
+      const productRows = session.queries.map(queryRowToProductRow);
+      rowsRef.current = productRows;
+      setRows(productRows);
+      setCartLines(resolveCartLines(productRows, session.other.cart));
+      sessionIdRef.current = session.id;
+      skipNextCartPersistRef.current = session.other.cart !== undefined;
+      setSrcInUrl(session.id);
+      for (const row of session.queries) {
+        if (row.other.status === "loading") {
+          const productRow = queryRowToProductRow(row);
+          enqueueInlineMatch(productRow.id, productRow.query);
+        }
+      }
+    },
+    [enqueueInlineMatch]
+  );
+
+  // Re-run match for hydrated rows interrupted mid-loading (SSR prop path).
   useEffect(() => {
     if (!initialSession) return;
     for (const row of initialSession.queries) {
@@ -608,14 +628,64 @@ export default function HomeSearchBox({
     [createDbQuery, enqueueInlineMatch]
   );
 
-  // Bootstrap from ?wanted=… — same path as typing products manually; strip param from URL.
+  // ?src= / ?wanted= (client) or legacy initialWanted prop — keeps home ISR.
   useEffect(() => {
-    clearWantedFromUrl();
-    if (initialSession || !initialWanted) return;
-    for (const keyword of parseWantedKeywords(initialWanted)) {
-      addProduct(keyword);
+    if (initialSession) {
+      clearWantedFromUrl();
+      return;
     }
-    // Once on mount for the deep-link payload.
+
+    if (initialWanted) {
+      clearWantedFromUrl();
+      for (const keyword of parseWantedKeywords(initialWanted)) {
+        addProduct(keyword);
+      }
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const src = (params.get(SRC_PARAM) ?? "").trim();
+    const wanted = (params.get(WANTED_PARAM) ?? "").trim();
+
+    if (src) {
+      clearWantedFromUrl();
+      let cancelled = false;
+      void (async () => {
+        try {
+          const response = await fetch(`/api/homesearch/session/${src}`);
+          if (!response.ok) {
+            if (wanted) {
+              for (const keyword of parseWantedKeywords(wanted)) {
+                addProduct(keyword);
+              }
+            }
+            return;
+          }
+          const session =
+            (await response.json()) as HomesearchSessionSnapshot;
+          if (cancelled) return;
+          applySessionSnapshot(session);
+        } catch (error) {
+          console.error("homesearch session restore failed:", error);
+          if (!cancelled && wanted) {
+            for (const keyword of parseWantedKeywords(wanted)) {
+              addProduct(keyword);
+            }
+          }
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    clearWantedFromUrl();
+    if (wanted) {
+      for (const keyword of parseWantedKeywords(wanted)) {
+        addProduct(keyword);
+      }
+    }
+    // Once on mount for deep-link / share restore.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

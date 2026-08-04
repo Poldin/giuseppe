@@ -1,15 +1,14 @@
 import { SeoHubSearch } from "@/app/components/seo/SeoHubSearch";
+import { SeoHubSearchFallback } from "@/app/components/seo/SeoHubSearchFallback";
 import {
   vsHubAbsoluteUrl,
   vsHubPath,
   vsCombinationPath,
 } from "@/app/lib/seo/vs-combination";
 import { SITE_NAME } from "@/app/lib/seo/site";
-import {
-  fetchVsHubSamples,
-  searchVsCombinations,
-} from "@/app/lib/vs/combination";
+import { fetchVsHubSamples } from "@/app/lib/vs/combination";
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 export const revalidate = 3600;
 
@@ -35,31 +34,31 @@ export const metadata: Metadata = {
   },
 };
 
-type PageProps = {
-  searchParams: Promise<{ q?: string }>;
-};
+export default async function VsHubPage() {
+  const rows = await fetchVsHubSamples();
+  const sampleHits = rows.map((hit) => ({
+    href: vsCombinationPath(hit.slug),
+    title: hit.canonical_name,
+    hint: "Apri miglior prezzo",
+  }));
 
-export default async function VsHubPage({ searchParams }: PageProps) {
-  const { q: rawQ } = await searchParams;
-  const q = (rawQ ?? "").trim();
-  const rows = q ? await searchVsCombinations(q) : await fetchVsHubSamples();
+  const props = {
+    hub: "vs" as const,
+    hubPath: vsHubPath(),
+    breadcrumbLabel: "Confronti prezzi",
+    title: "Cerca il miglior prezzo",
+    description:
+      "Stesso prodotto, shop diversi: trova il miglior prezzo e la differenza in chiaro. Digita un nome: mostriamo fino a 20 risultati.",
+    searchLabel: "Cerca confronto",
+    placeholder: "Es. guanti, composite, abutment",
+    emptyHint: "Digita un prodotto per trovare i confronti disponibili.",
+    sampleHits,
+    inputId: "vs-q",
+  };
 
   return (
-    <SeoHubSearch
-      hubPath={vsHubPath()}
-      breadcrumbLabel="Confronti prezzi"
-      title="Cerca il miglior prezzo"
-      description="Stesso prodotto, shop diversi: trova il miglior prezzo e la differenza in chiaro. Digita un nome: mostriamo fino a 20 risultati."
-      searchLabel="Cerca confronto"
-      placeholder="Es. guanti, composite, abutment"
-      emptyHint="Digita un prodotto per trovare i confronti disponibili."
-      q={q}
-      inputId="vs-q"
-      hits={rows.map((hit) => ({
-        href: vsCombinationPath(hit.slug),
-        title: hit.canonical_name,
-        hint: "Apri miglior prezzo",
-      }))}
-    />
+    <Suspense fallback={<SeoHubSearchFallback {...props} />}>
+      <SeoHubSearch {...props} />
+    </Suspense>
   );
 }

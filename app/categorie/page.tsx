@@ -1,8 +1,6 @@
 import { SeoHubSearch } from "@/app/components/seo/SeoHubSearch";
-import {
-  fetchTypeLanderHubList,
-  searchTypeLanders,
-} from "@/app/lib/category/type-lander";
+import { SeoHubSearchFallback } from "@/app/components/seo/SeoHubSearchFallback";
+import { fetchTypeLanderHubList } from "@/app/lib/category/type-lander";
 import { formatPubPrice } from "@/app/lib/pub/product";
 import {
   typeLanderHubAbsoluteUrl,
@@ -11,6 +9,7 @@ import {
 } from "@/app/lib/seo/type-lander";
 import { SITE_NAME } from "@/app/lib/seo/site";
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 export const revalidate = 86400;
 
@@ -36,36 +35,36 @@ export const metadata: Metadata = {
   },
 };
 
-type PageProps = {
-  searchParams: Promise<{ q?: string }>;
-};
+export default async function CategorieHubPage() {
+  const rows = await fetchTypeLanderHubList();
+  const sampleHits = rows.map((hit) => {
+    const count = hit.product_count.toLocaleString("it-IT");
+    const avg = formatPubPrice(hit.avg_price);
+    return {
+      href: typeLanderPath(hit.slug),
+      title: hit.seo_title,
+      eyebrow: avg ? `${count} prodotti · media ${avg}` : `${count} prodotti`,
+      hint: "Apri categoria",
+    };
+  });
 
-export default async function CategorieHubPage({ searchParams }: PageProps) {
-  const { q: rawQ } = await searchParams;
-  const q = (rawQ ?? "").trim();
-  const rows = q ? await searchTypeLanders(q) : await fetchTypeLanderHubList();
+  const props = {
+    hub: "categorie" as const,
+    hubPath: typeLanderHubPath(),
+    breadcrumbLabel: "Categorie",
+    title: "Categorie prodotti",
+    description:
+      "Tipologie e linee prodotto con quantità e prezzo medio di catalogo. Digita un nome: frese, camici, Bonartic…",
+    searchLabel: "Cerca categoria",
+    placeholder: "Es. frese, denti, Bonartic",
+    emptyHint: "Digita una categoria o una linea prodotto.",
+    sampleHits,
+    inputId: "categorie-q",
+  };
 
   return (
-    <SeoHubSearch
-      hubPath={typeLanderHubPath()}
-      breadcrumbLabel="Categorie"
-      title="Categorie prodotti"
-      description="Tipologie e linee prodotto con quantità e prezzo medio di catalogo. Digita un nome: frese, camici, Bonartic…"
-      searchLabel="Cerca categoria"
-      placeholder="Es. frese, denti, Bonartic"
-      emptyHint="Digita una categoria o una linea prodotto."
-      q={q}
-      inputId="categorie-q"
-      hits={rows.map((hit) => {
-        const count = hit.product_count.toLocaleString("it-IT");
-        const avg = formatPubPrice(hit.avg_price);
-        return {
-          href: typeLanderPath(hit.slug),
-          title: hit.seo_title,
-          eyebrow: avg ? `${count} prodotti · media ${avg}` : `${count} prodotti`,
-          hint: "Apri categoria",
-        };
-      })}
-    />
+    <Suspense fallback={<SeoHubSearchFallback {...props} />}>
+      <SeoHubSearch {...props} />
+    </Suspense>
   );
 }

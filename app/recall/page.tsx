@@ -1,8 +1,6 @@
 import { SeoHubSearch } from "@/app/components/seo/SeoHubSearch";
-import {
-  fetchRecallHubSamples,
-  searchRecalls,
-} from "@/app/lib/recall/recall";
+import { SeoHubSearchFallback } from "@/app/components/seo/SeoHubSearchFallback";
+import { fetchRecallHubSamples } from "@/app/lib/recall/recall";
 import {
   recallHubAbsoluteUrl,
   recallHubPath,
@@ -10,6 +8,7 @@ import {
 } from "@/app/lib/seo/recall";
 import { SITE_NAME } from "@/app/lib/seo/site";
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 export const revalidate = 3600;
 
@@ -35,37 +34,38 @@ export const metadata: Metadata = {
   },
 };
 
-type PageProps = {
-  searchParams: Promise<{ q?: string }>;
-};
+export default async function RecallHubPage() {
+  const rows = await fetchRecallHubSamples();
+  const sampleHits = rows.map((hit) => {
+    const meta = [hit.fabbricante, hit.tipo_dispositivo]
+      .filter(Boolean)
+      .join(" · ");
+    return {
+      href: recallPath(hit.numero_riferimento),
+      title: hit.name,
+      eyebrow: meta || `N. ${hit.numero_riferimento}`,
+      hint: `Avviso ${hit.numero_riferimento} — apri scheda`,
+    };
+  });
 
-export default async function RecallHubPage({ searchParams }: PageProps) {
-  const { q: rawQ } = await searchParams;
-  const q = (rawQ ?? "").trim();
-  const rows = q ? await searchRecalls(q) : await fetchRecallHubSamples();
+  const props = {
+    hub: "recall" as const,
+    hubPath: recallHubPath(),
+    breadcrumbLabel: "Avvisi di sicurezza",
+    title: "Cerca avvisi di sicurezza",
+    description:
+      "Avvisi e recall di dispositivi medici dal Ministero della Salute. Digita dispositivo, fabbricante o numero: fino a 20 risultati.",
+    searchLabel: "Cerca avviso",
+    placeholder: "Es. fabbricante, dispositivo, numero",
+    emptyHint:
+      "Digita un dispositivo, un fabbricante o un numero di riferimento.",
+    sampleHits,
+    inputId: "recall-q",
+  };
 
   return (
-    <SeoHubSearch
-      hubPath={recallHubPath()}
-      breadcrumbLabel="Avvisi di sicurezza"
-      title="Cerca avvisi di sicurezza"
-      description="Avvisi e recall di dispositivi medici dal Ministero della Salute. Digita dispositivo, fabbricante o numero: fino a 20 risultati."
-      searchLabel="Cerca avviso"
-      placeholder="Es. fabbricante, dispositivo, numero"
-      emptyHint="Digita un dispositivo, un fabbricante o un numero di riferimento."
-      q={q}
-      inputId="recall-q"
-      hits={rows.map((hit) => {
-        const meta = [hit.fabbricante, hit.tipo_dispositivo]
-          .filter(Boolean)
-          .join(" · ");
-        return {
-          href: recallPath(hit.numero_riferimento),
-          title: hit.name,
-          eyebrow: meta || `N. ${hit.numero_riferimento}`,
-          hint: `Avviso ${hit.numero_riferimento} — apri scheda`,
-        };
-      })}
-    />
+    <Suspense fallback={<SeoHubSearchFallback {...props} />}>
+      <SeoHubSearch {...props} />
+    </Suspense>
   );
 }
